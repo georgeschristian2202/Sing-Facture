@@ -1,0 +1,33 @@
+{
+  "name": "sing-facture-pro",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Application web de gestion commerciale complète pour SING S.A.",
+  "author": "SING S.A. <info@sing.ga>",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "echo 'Linting not configured yet'"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.22.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.1.4"
+  },
+  "keywords": [
+    "facturation",
+    "gestion-commerciale",
+    "gabon",
+    "tps",
+    "css",
+    "devis",
+    "facture"
+  ]
+}
