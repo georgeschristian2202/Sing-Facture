@@ -8,6 +8,7 @@ export interface AuthRequest extends Request {
     id: number;
     email: string;
     role: string;
+    organisationId: number;
   };
 }
 
@@ -20,7 +21,12 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: number; email: string; role: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as { 
+      id: number; 
+      email: string; 
+      role: string;
+      organisationId: number;
+    };
     req.user = decoded;
     next();
   } catch (error) {
@@ -29,7 +35,7 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
 };
 
 export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (req.user?.role !== 'admin') {
+  if (req.user?.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
   }
   next();

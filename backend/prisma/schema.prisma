@@ -10,14 +10,47 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  nom       String
-  role      Role     @default(USER)
-  createdAt DateTime @default(now()) @map("created_at")
+model Organisation {
+  id              Int      @id @default(autoincrement())
+  nom             String
+  email           String   @unique
+  telephone       String?
+  adresse         String?
+  rccm            String?
+  capital         String?
+  logo            String?
+  actif           Boolean  @default(true)
+  dateExpiration  DateTime? @map("date_expiration")
+  plan            Plan     @default(STARTER)
+  createdAt       DateTime @default(now()) @map("created_at")
+  users           User[]
+  clients         Client[]
+  produits        Produit[]
+  documents       Document[]
+  parametres      Parametres?
 
+  @@map("organisations")
+}
+
+enum Plan {
+  STARTER
+  BUSINESS
+  ENTERPRISE
+
+  @@map("plan")
+}
+
+model User {
+  id             Int           @id @default(autoincrement())
+  email          String        @unique
+  password       String
+  nom            String
+  role           Role          @default(USER)
+  organisationId Int           @map("organisation_id")
+  organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([organisationId])
   @@map("users")
 }
 
@@ -29,30 +62,53 @@ enum Role {
 }
 
 model Client {
-  id        Int        @id @default(autoincrement())
-  nom       String
-  adresse   String?
-  tel       String?
-  email     String?
-  pays      String     @default("Gabon")
-  createdAt DateTime   @default(now()) @map("created_at")
-  documents Document[]
+  id             Int           @id @default(autoincrement())
+  nom            String        // Nom de l'organisation cliente
+  adresse        String?
+  tel            String?       // Téléphone principal de l'organisation
+  email          String?       // Email principal de l'organisation
+  pays           String        @default("Gabon")
+  organisationId Int           @map("organisation_id")
+  organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  documents      Document[]
+  representants  Representant[] // Personnes de contact du client
 
+  @@index([organisationId])
   @@map("clients")
+}
+
+// Représentants (personnes de contact) d'un client
+model Representant {
+  id        Int      @id @default(autoincrement())
+  clientId  Int      @map("client_id")
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  nom       String   // Nom complet du représentant
+  fonction  String?  // Poste/Fonction (ex: Directeur, Responsable Achats)
+  tel       String?  // Téléphone direct du représentant
+  email     String?  // Email du représentant
+  principal Boolean  @default(false) // Représentant principal
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([clientId])
+  @@map("representants")
 }
 
 model Produit {
   id              Int              @id @default(autoincrement())
-  code            String           @unique
+  code            String
   label           String
   prix            Decimal          @db.Decimal(15, 2)
   categorie       String
   description     String?
   actif           Boolean          @default(true)
+  organisationId  Int              @map("organisation_id")
+  organisation    Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   createdAt       DateTime         @default(now()) @map("created_at")
   lignesDocument  LigneDocument[]
 
-  @@index([code])
+  @@unique([code, organisationId])
+  @@index([organisationId])
   @@index([categorie])
   @@map("produits")
 }
@@ -60,9 +116,11 @@ model Produit {
 model Document {
   id                   Int             @id @default(autoincrement())
   type                 TypeDocument
-  numero               String          @unique
+  numero               String
   clientId             Int             @map("client_id")
   client               Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  organisationId       Int             @map("organisation_id")
+  organisation         Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   date                 DateTime        @db.Date
   reference            String?
   soldeHt              Decimal         @map("solde_ht") @db.Decimal(15, 2)
@@ -77,7 +135,9 @@ model Document {
   createdAt            DateTime        @default(now()) @map("created_at")
   lignes               LigneDocument[]
 
+  @@unique([numero, organisationId])
   @@index([clientId])
+  @@index([organisationId])
   @@index([date])
   @@index([type])
   @@map("documents")
@@ -85,6 +145,8 @@ model Document {
 
 enum TypeDocument {
   DEVIS
+  COMMANDE
+  LIVRAISON
   FACTURE
   AVOIR
 
@@ -115,20 +177,90 @@ model LigneDocument {
 }
 
 model Parametres {
-  id            Int     @id @default(1)
-  nomEntreprise String  @default("SING S.A.") @map("nom_entreprise")
-  adresse       String  @default("BP. 2280, Centre Ville, Libreville – Gabon")
-  telephone     String  @default("+241 74 13 71 03")
-  email         String  @default("info@sing.ga")
-  siteWeb       String  @default("https://www.sing.ga/") @map("site_web")
-  rccm          String  @default("RG LBV 2018B22204")
-  capital       String  @default("50 000 000 FCFA")
-  tauxTps       Decimal @default(0.095) @map("taux_tps") @db.Decimal(5, 4)
-  tauxCss       Decimal @default(0.01) @map("taux_css") @db.Decimal(5, 4)
-  tauxTva       Decimal @default(0.18) @map("taux_tva") @db.Decimal(5, 4)
-  tauxRemise    Decimal @default(0.095) @map("taux_remise") @db.Decimal(5, 4)
-  ribUba        String  @default("40025 05801 80100300296 81") @map("rib_uba")
-  ribAfg        String  @default("40001 09070 07000615101 36") @map("rib_afg")
+  id             Int          @id @default(autoincrement())
+  organisationId Int          @unique @map("organisation_id")
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  nomEntreprise  String       @default("Mon Entreprise") @map("nom_entreprise")
+  adresse        String       @default("")
+  telephone      String       @default("")
+  email          String       @default("")
+  siteWeb        String       @default("") @map("site_web")
+  rccm           String       @default("")
+  capital        String       @default("")
+  tauxTps        Decimal      @default(0.095) @map("taux_tps") @db.Decimal(5, 4)
+  tauxCss        Decimal      @default(0.01) @map("taux_css") @db.Decimal(5, 4)
+  tauxTva        Decimal      @default(0.18) @map("taux_tva") @db.Decimal(5, 4)
+  tauxRemise     Decimal      @default(0.095) @map("taux_remise") @db.Decimal(5, 4)
+  ribUba         String       @default("") @map("rib_uba")
+  ribAfg         String       @default("") @map("rib_afg")
 
   @@map("parametres")
+}
+
+// Système de PACKS (codes produits avec sous-services)
+model Pack {
+  id              Int          @id @default(autoincrement())
+  code            String
+  descCourte      String       @map("desc_courte")
+  prixUnitaire    Decimal      @map("prix_unitaire") @db.Decimal(15, 2)
+  sousService     String       @map("sous_service")
+  organisationId  Int          @map("organisation_id")
+  actif           Boolean      @default(true)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  details         PackDetail[]
+
+  @@unique([code, organisationId])
+  @@index([organisationId])
+  @@index([sousService])
+  @@map("packs")
+}
+
+// Détails des PACKS (lignes de description)
+model PackDetail {
+  id              Int      @id @default(autoincrement())
+  packId          Int      @map("pack_id")
+  pack            Pack     @relation(fields: [packId], references: [id], onDelete: Cascade)
+  ordre           Int      @default(0)
+  descriptionLongue String @map("description_longue")
+
+  @@index([packId])
+  @@map("pack_details")
+}
+
+// Récapitulatif des factures (vue consolidée)
+model Recapitulatif {
+  id                Int      @id @default(autoincrement())
+  organisationId    Int      @map("organisation_id")
+  documentId        Int?     @map("document_id")
+  dateFacture       DateTime @map("date_facture") @db.Date
+  designation       String
+  numeroFacture     String   @map("numero_facture")
+  numeroBc          String?  @map("numero_bc")
+  
+  // Montants par sous-service (colonnes dynamiques)
+  montantServices   Json     @map("montant_services") // {"Assistance informatique": 50000, "Formation": 30000}
+  
+  // Totaux
+  soldeHt           Decimal  @map("solde_ht") @db.Decimal(15, 2)
+  remise            Decimal  @default(0) @db.Decimal(15, 2)
+  sousTotal2        Decimal  @map("sous_total_2") @db.Decimal(15, 2)
+  tps               Decimal  @db.Decimal(15, 2)
+  css               Decimal  @db.Decimal(15, 2)
+  netAPayer         Decimal  @map("net_a_payer") @db.Decimal(15, 2)
+  
+  // Règlement
+  reglement         Decimal? @db.Decimal(15, 2)
+  soldeDu           Decimal? @map("solde_du") @db.Decimal(15, 2)
+  dateReglement     DateTime? @map("date_reglement") @db.Date
+  
+  // Statut
+  etat              StatutDocument @default(ACTIVE)
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([organisationId])
+  @@index([dateFacture])
+  @@index([numeroFacture])
+  @@map("recapitulatif")
 }

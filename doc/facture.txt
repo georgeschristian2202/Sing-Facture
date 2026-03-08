@@ -1,0 +1,495 @@
+Option Explicit
+
+'?????????????????????????????????????????????????????????????????????????????
+'  MODULE FACTURE - AVEC ALIMENTATION AUTOMATIQUE DU RECAP
+'?????????????????????????????????????????????????????????????????????????????
+
+'-------------------------------------------------------------
+' FONCTION PRIVÉE : Calcule la prochaine référence
+'-------------------------------------------------------------
+Private Function NextReference( _
+    ByVal ws As Worksheet, _
+    ByVal refAddress As String, _
+    ByVal docDate As Date, _
+    ByVal prefix As String _
+) As String
+    
+    Dim refActuelle As String
+    Dim annee As Long, mois As String
+    Dim anneeRef As Long, moisRef As String
+    Dim compteur As Long
+    Dim parts() As String
+    Dim part0 As String, part1 As String, part2 As String
+    
+    annee = Year(docDate)
+    mois = Format(Month(docDate), "00")
+    
+    refActuelle = CStr(ws.Range(refAddress).Value)
+    
+    If Len(refActuelle) > 0 Then
+        parts = Split(refActuelle, "/")
+        
+        If UBound(parts) = 2 Then
+            part0 = parts(0)
+            part1 = parts(1)
+            part2 = parts(2)
+            
+            If Len(part0) >= 4 Then
+                anneeRef = CLng(Right$(part0, 4))
+            Else
+                anneeRef = annee
+            End If
+            
+            moisRef = Right$("0" & part1, 2)
+            
+            If IsNumeric(part2) Then
+                compteur = CLng(part2)
+            Else
+                compteur = 0
+            End If
+        Else
+            anneeRef = annee
+            moisRef = mois
+            compteur = 0
+        End If
+    Else
+        anneeRef = annee
+        moisRef = mois
+        compteur = 0
+    End If
+    
+    If (annee = anneeRef) And (mois = moisRef) Then
+        compteur = compteur + 1
+    Else
+        compteur = 1
+    End If
+    
+    NextReference = prefix & annee & "/" & mois & "/" & Format$(compteur, "000")
+End Function
+
+'-------------------------------------------------------------
+' FONCTION PRIVÉE : Nettoyer les caractères interdits
+'-------------------------------------------------------------
+Private Function SanitizeFileName(ByVal s As String) As String
+    Dim badChars As Variant
+    Dim c As Variant
+    
+    badChars = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+    
+    For Each c In badChars
+        s = Replace$(s, c, "-")
+    Next c
+    
+    SanitizeFileName = s
+End Function
+
+
+'?????????????????????????????????????????????????????????????????????????????
+'  FONCTIONS PUBLIQUES - FACTURE
+'?????????????????????????????????????????????????????????????????????????????
+
+Sub Nouvelle_Facture_Sing()
+    Dim ws As Worksheet
+    Dim d As Date
+    
+    Const DATE_CELL As String = "K13"
+    Const REF_CELL As String = "K12"
+    
+    Set ws = ThisWorkbook.Worksheets("Facture Sing")
+    
+    If IsDate(ws.Range(DATE_CELL).Value) Then
+        d = CDate(ws.Range(DATE_CELL).Value)
+    Else
+        d = Date
+        ws.Range(DATE_CELL).Value = d
+    End If
+    
+    ws.Range(REF_CELL).Value = NextReference(ws, REF_CELL, d, "")
+    
+    ws.Range("D25:D59").Value = ""
+    ws.Range("C25:C59").Value = ""
+    ws.Range("H25:H59").Value = ""
+    ws.Range("K25:K59").Value = ""
+    ws.Range("I25:I59").Value = ""
+    ws.Range("I25").Value = ""
+    ws.Range("D17").Value = ""
+    ws.Range("D22").Value = ""
+    ws.Range("D64").Value = ""
+    ws.Range("D67").Value = ""
+    ws.Range("K66").Value = ""
+End Sub
+
+Sub annuler_Facture_Sing()
+    With Sheets("Facture Sing")
+        .Range("D25:D59").Value = ""
+        .Range("C25:C59").Value = ""
+        .Range("H25:H59").Value = ""
+        .Range("K25:K59").Value = ""
+        .Range("I25:I59").Value = ""
+        .Range("I25").Value = ""
+        .Range("D17").Value = ""
+        .Range("D22").Value = ""
+        .Range("D64").Value = ""
+        .Range("D67").Value = ""
+        .Range("K66").Value = ""
+    End With
+End Sub
+
+
+'?????????????????????????????????????????????????????????????????????????????
+'  ENREGISTRER LA FACTURE + ALIMENTER LE RECAP
+'?????????????????????????????????????????????????????????????????????????????
+
+Sub Facture_Enregistrer()
+    On Error GoTo ErrHandler
+    
+    Dim wb As Workbook
+    Dim feuille As Worksheet
+    Dim plage As String
+    Dim nomDocument As String
+    Dim dossierAdresse As String
+    Dim fullPath As String
+    Dim iVis As XlSheetVisibility
+    
+    Set wb = ThisWorkbook
+    Set feuille = wb.Sheets("Facture Sing")
+    
+    '--- 1) VÉRIFICATION : Le workbook doit être sauvegardé
+    If wb.Path = "" Then
+        MsgBox "Veuillez d'abord enregistrer le fichier Excel avant d'exporter la facture.", _
+               vbExclamation, "Fichier non enregistré"
+        Exit Sub
+    End If
+    
+    '--- 2) RÉCUPÉRATION DU DOSSIER depuis Parameters!K12
+    dossierAdresse = Trim$(Sheets("Parameters").Range("K12").Value)
+    
+    If Len(dossierAdresse) = 0 Then
+        MsgBox "Le chemin du dossier des factures est vide (Parameters!K12).", _
+               vbCritical, "Export PDF"
+        Exit Sub
+    End If
+    
+    If Right$(dossierAdresse, 1) <> "\" Then
+        dossierAdresse = dossierAdresse & "\"
+    End If
+    
+    If Dir(dossierAdresse, vbDirectory) = "" Then
+        MsgBox "Le dossier suivant n'existe pas :" & vbCrLf & dossierAdresse & vbCrLf & vbCrLf & _
+               "Veuillez créer ce dossier ou modifier le chemin dans Parameters!K12", _
+               vbCritical, "Export PDF"
+        Exit Sub
+    End If
+    
+    '--- 3) CONSTRUIRE LE NOM DE FICHIER
+    nomDocument = Trim$(CStr(feuille.Range("K12").Value))
+    
+    If Len(nomDocument) = 0 Then
+        MsgBox "La référence de la facture (K12) est vide." & vbCrLf & _
+               "Cliquez d'abord sur 'Nouvelle Facture'.", _
+               vbCritical, "Export PDF"
+        Exit Sub
+    End If
+    
+    nomDocument = SanitizeFileName(nomDocument)
+    fullPath = dossierAdresse & nomDocument & ".pdf"
+    
+    '--- 4) ALIMENTER LE RECAP SING (AUTOMATIQUE)
+    Call AlimenterRecapDepuisFacture(feuille)
+    
+    '--- 5) CONFIGURATION DE LA PAGE
+    plage = "$B$6:$L$81"
+    
+    Application.ScreenUpdating = False
+    
+    With feuille.PageSetup
+        .PrintArea = plage
+        .FitToPagesTall = 1
+        .FitToPagesWide = 1
+        .LeftMargin = Application.InchesToPoints(0)
+        .RightMargin = Application.InchesToPoints(0)
+        .TopMargin = Application.InchesToPoints(0)
+        .BottomMargin = Application.InchesToPoints(0)
+    End With
+    
+    '--- 6) EXPORT PDF
+    With feuille
+        iVis = .Visible
+        .Visible = xlSheetVisible
+        .Activate
+        
+        .ExportAsFixedFormat Type:=xlTypePDF, _
+            Filename:=fullPath, _
+            Quality:=xlQualityStandard, _
+            IncludeDocProperties:=True, _
+            IgnorePrintAreas:=False, _
+            OpenAfterPublish:=True
+        
+        .Visible = iVis
+    End With
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "Facture enregistrée et exportée avec succès !" & vbCrLf & _
+           "PDF : " & fullPath & vbCrLf & vbCrLf & _
+           "Le RECAP a été mis à jour automatiquement.", _
+           vbInformation, "Export PDF"
+    
+    On Error GoTo 0
+    Exit Sub
+    
+ErrHandler:
+    Application.ScreenUpdating = True
+    MsgBox "Erreur lors de l'export de la facture :" & vbCrLf & vbCrLf & _
+           "Erreur " & Err.Number & ": " & Err.Description & vbCrLf & vbCrLf & _
+           "Chemin tenté : " & fullPath, _
+           vbCritical, "Export PDF"
+    On Error GoTo 0
+End Sub
+
+
+'?????????????????????????????????????????????????????????????????????????????
+'  ALIMENTER LE RECAP AUTOMATIQUEMENT
+'?????????????????????????????????????????????????????????????????????????????
+
+Private Sub AlimenterRecapDepuisFacture(ByVal wsFacture As Worksheet)
+    On Error GoTo ErrHandler
+    
+    Dim wsRecap As Worksheet
+    Dim wsParams As Worksheet
+    Dim tblPacks As ListObject
+    Dim dataPacks As Range
+    
+    Dim cell As Range
+    Dim codePack As String
+    Dim idx As Variant
+    Dim sousService As String
+    Dim montantPack As Double
+    Dim descCourte As String
+    Dim dateFacture As Date
+    Dim totalHT As Double
+    Dim remise As Double
+    Dim sousTotalAvantTaxes As Double
+    Dim tps As Double
+    Dim css As Double
+    Dim netAPayer As Double
+    
+    Dim dictServices As Object
+    Dim dictDesignations As Object
+    Dim key As Variant
+    Dim nouvelleLigne As Long
+    Dim colService As Long
+    Dim headerCell As Range
+    
+    ' Dictionnaires pour accumuler les montants et les désignations
+    Set dictServices = CreateObject("Scripting.Dictionary")
+    Set dictDesignations = CreateObject("Scripting.Dictionary")
+    
+    Set wsRecap = ThisWorkbook.Worksheets("Recap Sing")
+    Set wsParams = ThisWorkbook.Worksheets("Parameters")
+    Set tblPacks = wsParams.ListObjects("T_PACKS")
+    Set dataPacks = tblPacks.DataBodyRange
+    
+    ' Récupérer la date de la facture (K13)
+    If IsDate(wsFacture.Range("K13").Value) Then
+        dateFacture = CDate(wsFacture.Range("K13").Value)
+    Else
+        dateFacture = Date ' Date du jour par défaut
+    End If
+    
+    ' Parcourir les codes PACKS dans la facture (A19:A30)
+    For Each cell In wsFacture.Range("A19:A30")
+        codePack = Trim(CStr(cell.Value))
+        
+        If codePack <> "" Then
+            ' Chercher le code dans T_PACKS
+            idx = Application.Match(codePack, dataPacks.Columns(1), 0)
+            
+            If Not IsError(idx) Then
+                ' Récupérer le SOUS_SERVICE (dernière colonne de T_PACKS)
+                sousService = Trim(CStr(dataPacks.Cells(idx, dataPacks.Columns.Count).Value))
+                
+                ' Récupérer DESC_COURTE2 (colonne 3 de T_PACKS)
+                descCourte = Trim(CStr(dataPacks.Cells(idx, 3).Value))
+                
+                ' Stocker la désignation (on prend la première trouvée)
+                If Not dictDesignations.Exists("designation") Then
+                    dictDesignations.Add "designation", descCourte
+                End If
+                
+                ' Calculer le montant de ce pack
+                ' Chercher la ligne correspondante dans les détails de la facture (lignes 25 à 59)
+                Dim ligneFacture As Long
+                For ligneFacture = 25 To 59
+                    If Trim(CStr(wsFacture.Cells(ligneFacture, "C").Value)) = codePack Then
+                        ' Prix unitaire en colonne H, Quantité en colonne I
+                        If IsNumeric(wsFacture.Cells(ligneFacture, "H").Value) And _
+                           IsNumeric(wsFacture.Cells(ligneFacture, "I").Value) Then
+                            montantPack = CDbl(wsFacture.Cells(ligneFacture, "H").Value) * _
+                                        CDbl(wsFacture.Cells(ligneFacture, "I").Value)
+                            
+                            ' Accumuler dans le dictionnaire par sous-service
+                            If dictServices.Exists(sousService) Then
+                                dictServices(sousService) = dictServices(sousService) + montantPack
+                            Else
+                                dictServices.Add sousService, montantPack
+                            End If
+                            
+                            Exit For ' Sortir de la boucle une fois trouvé
+                        End If
+                    End If
+                Next ligneFacture
+            End If
+        End If
+    Next cell
+    
+    ' Si aucun montant, sortir
+    If dictServices.Count = 0 Then Exit Sub
+    
+    ' ???????????????????????????????????????????????????????????????
+    ' RÉCUPÉRER LES MONTANTS EXACTS DEPUIS LA FACTURE (ne pas recalculer !)
+    ' ???????????????????????????????????????????????????????????????
+    
+    ' Sous-total (ligne 60, colonne K)
+    If IsNumeric(wsFacture.Range("K60").Value) Then
+        totalHT = CDbl(wsFacture.Range("K60").Value)
+    End If
+    
+    ' Remise (ligne 61, colonne K)
+    If IsNumeric(wsFacture.Range("K61").Value) Then
+        remise = CDbl(wsFacture.Range("K61").Value)
+    Else
+        remise = 0
+    End If
+    
+    ' Sous-total 2 après remise (ligne 62, colonne K)
+    If IsNumeric(wsFacture.Range("K62").Value) Then
+        sousTotalAvantTaxes = CDbl(wsFacture.Range("K62").Value)
+    Else
+        sousTotalAvantTaxes = totalHT - remise
+    End If
+    
+    ' TPS (ligne 63, colonne K)
+    If IsNumeric(wsFacture.Range("K63").Value) Then
+        tps = CDbl(wsFacture.Range("K63").Value)
+    Else
+        tps = 0
+    End If
+    
+    ' CSS (ligne 64, colonne K)
+    If IsNumeric(wsFacture.Range("K64").Value) Then
+        css = CDbl(wsFacture.Range("K64").Value)
+    Else
+        css = 0
+    End If
+    
+    ' Net à payer (ligne 65, colonne K)
+    If IsNumeric(wsFacture.Range("K65").Value) Then
+        netAPayer = CDbl(wsFacture.Range("K65").Value)
+    Else
+        netAPayer = sousTotalAvantTaxes + tps + css
+    End If
+    
+    ' Trouver la première ligne vide dans le RECAP (à partir de ligne 8)
+    nouvelleLigne = 8
+    Do While Trim(CStr(wsRecap.Cells(nouvelleLigne, "C").Value)) <> ""
+        nouvelleLigne = nouvelleLigne + 1
+        If nouvelleLigne > 100 Then Exit Sub ' Sécurité : limite étendue
+    Loop
+    
+    ' ???????????????????????????????????????????????????????????????
+    ' REMPLIR LES COLONNES DE BASE (A à D)
+    ' ???????????????????????????????????????????????????????????????
+    
+    wsRecap.Cells(nouvelleLigne, "A").Value = dateFacture ' Date Fac
+    
+    ' DESIGNATION : Récupérer la DESC_COURTE2 du premier pack
+    If dictDesignations.Exists("designation") Then
+        wsRecap.Cells(nouvelleLigne, "B").Value = dictDesignations("designation")
+    End If
+    
+    wsRecap.Cells(nouvelleLigne, "C").Value = wsFacture.Range("K12").Value ' N° Facture
+    wsRecap.Cells(nouvelleLigne, "D").Value = "" ' N° BC ou marché (vide pour l'instant)
+    
+    ' ???????????????????????????????????????????????????????????????
+    ' RÉPARTITION AUTOMATIQUE PAR SOUS-SERVICE (colonnes E à ...)
+    ' ???????????????????????????????????????????????????????????????
+    
+    ' RECHERCHE AUTOMATIQUE DES COLONNES dans la ligne 6 du RECAP
+    For Each key In dictServices.Keys
+        ' Chercher le sous-service dans les en-têtes (ligne 6, colonnes E à AE environ)
+        For colService = 5 To 31 ' Colonnes E (5) à AE (31) - étendu pour couvrir tous les services
+            Set headerCell = wsRecap.Cells(6, colService)
+            
+            ' Comparaison sans tenir compte des espaces en trop
+            If Trim(CStr(headerCell.Value)) = Trim(CStr(key)) Then
+                ' Colonne trouvée ! Inscrire le montant
+                wsRecap.Cells(nouvelleLigne, colService).Value = dictServices(key)
+                Exit For
+            End If
+        Next colService
+    Next key
+    
+    ' ???????????????????????????????????????????????????????????????
+    ' REMPLIR LES COLONNES DE CALCUL (colonnes après les sous-services)
+    ' ???????????????????????????????????????????????????????????????
+    
+    ' Trouver dynamiquement les colonnes des totaux en cherchant dans la ligne 6
+    Dim colSoldeHT As Long, colRemise As Long, colSousTotal2 As Long
+    Dim colTPS As Long, colCSS As Long, colNetAPayer As Long
+    Dim colReglement As Long, colSolduDu As Long, colDateReglement As Long
+    
+    ' Initialiser à 0 (colonnes non trouvées)
+    colSoldeHT = 0: colRemise = 0: colSousTotal2 = 0
+    colTPS = 0: colCSS = 0: colNetAPayer = 0
+    colReglement = 0: colSolduDu = 0: colDateReglement = 0
+    
+    ' Chercher les colonnes dans la ligne 6
+    For colService = 5 To 50 ' Balayer large
+        Set headerCell = wsRecap.Cells(6, colService)
+        Dim headerText As String
+        headerText = Trim(CStr(headerCell.Value))
+        
+        ' Identifier les colonnes selon leur en-tête
+        Select Case headerText
+            Case "Solde HT"
+                colSoldeHT = colService
+            Case "Remise (montant)", "Remise"
+                colRemise = colService
+            Case "Sous-total 2"
+                colSousTotal2 = colService
+            Case "TPS 9.5%", "TPS 9,5%", "TPS"
+                colTPS = colService
+            Case "CSS 1%", "CSS"
+                colCSS = colService
+            Case "Net à payer", "Net a payer"
+                colNetAPayer = colService
+            Case "Règlement ou Acompte", "Reglement ou Acompte"
+                colReglement = colService
+            Case "Soldu dû", "Soldu du"
+                colSolduDu = colService
+            Case "Date de règlement", "Date de reglement"
+                colDateReglement = colService
+        End Select
+    Next colService
+    
+    ' Remplir les colonnes trouvées
+    If colSoldeHT > 0 Then wsRecap.Cells(nouvelleLigne, colSoldeHT).Value = totalHT
+    If colRemise > 0 Then wsRecap.Cells(nouvelleLigne, colRemise).Value = remise
+    If colSousTotal2 > 0 Then wsRecap.Cells(nouvelleLigne, colSousTotal2).Value = sousTotalAvantTaxes
+    If colTPS > 0 Then wsRecap.Cells(nouvelleLigne, colTPS).Value = tps
+    If colCSS > 0 Then wsRecap.Cells(nouvelleLigne, colCSS).Value = css
+    If colNetAPayer > 0 Then wsRecap.Cells(nouvelleLigne, colNetAPayer).Value = netAPayer
+    
+    ' Règlement et Solde dû : laisser vide pour saisie manuelle ultérieure
+    ' État de la facture : Active par défaut
+    wsRecap.Cells(nouvelleLigne, "AG").Value = "Active"
+    Exit Sub
+    
+ErrHandler:
+    MsgBox "Erreur lors de l'alimentation du RECAP :" & vbCrLf & _
+           "Erreur " & Err.Number & ": " & Err.Description, _
+           vbExclamation, "Alimentation RECAP"
+End Sub
+
+

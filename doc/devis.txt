@@ -1,0 +1,412 @@
+Option Explicit
+
+'?????????????????????????????????????????????????????????????????????????????
+'  MODULE DEVIS - GESTION COMPLÈTE DES DEVIS
+'  Référence : DEV2025/01/001
+'  Avec génération automatique depuis codes PACKS
+'?????????????????????????????????????????????????????????????????????????????
+
+'-------------------------------------------------------------
+' FONCTION PRIVÉE : Calcule la prochaine référence
+' Format : <prefixe><AAAA>/<MM>/<NNN>
+'-------------------------------------------------------------
+Private Function NextReference( _
+    ByVal ws As Worksheet, _
+    ByVal refAddress As String, _
+    ByVal docDate As Date, _
+    ByVal prefix As String _
+) As String
+    
+    Dim refActuelle As String
+    Dim annee As Long, mois As String
+    Dim anneeRef As Long, moisRef As String
+    Dim compteur As Long
+    Dim parts() As String
+    Dim part0 As String, part1 As String, part2 As String
+    
+    annee = Year(docDate)
+    mois = Format(Month(docDate), "00")
+    
+    refActuelle = CStr(ws.Range(refAddress).Value)
+    
+    If Len(refActuelle) > 0 Then
+        parts = Split(refActuelle, "/")
+        
+        If UBound(parts) = 2 Then
+            part0 = parts(0)
+            part1 = parts(1)
+            part2 = parts(2)
+            
+            If Len(part0) >= 4 Then
+                anneeRef = CLng(Right$(part0, 4))
+            Else
+                anneeRef = annee
+            End If
+            
+            moisRef = Right$("0" & part1, 2)
+            
+            If IsNumeric(part2) Then
+                compteur = CLng(part2)
+            Else
+                compteur = 0
+            End If
+        Else
+            anneeRef = annee
+            moisRef = mois
+            compteur = 0
+        End If
+    Else
+        anneeRef = annee
+        moisRef = mois
+        compteur = 0
+    End If
+    
+    If (annee = anneeRef) And (mois = moisRef) Then
+        compteur = compteur + 1
+    Else
+        compteur = 1
+    End If
+    
+    NextReference = prefix & annee & "/" & mois & "/" & Format$(compteur, "000")
+End Function
+
+'-------------------------------------------------------------
+' FONCTION PRIVÉE : Nettoyer les caractères interdits
+'-------------------------------------------------------------
+Private Function SanitizeFileName(ByVal s As String) As String
+    Dim badChars As Variant
+    Dim c As Variant
+    
+    badChars = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+    
+    For Each c In badChars
+        s = Replace$(s, c, "-")
+    Next c
+    
+    SanitizeFileName = s
+End Function
+
+
+'?????????????????????????????????????????????????????????????????????????????
+'  FONCTIONS PUBLIQUES - DEVIS
+'?????????????????????????????????????????????????????????????????????????????
+
+'-------------------------------------------------------------
+' Créer un nouveau devis avec référence automatique
+' Référence générée : DEV2025/01/001
+'-------------------------------------------------------------
+Sub Nouveau_Devis_Sing()
+    Dim ws As Worksheet
+    Dim d As Date
+    
+    Const DATE_CELL As String = "K13"
+    Const REF_CELL As String = "K12"
+    
+    Set ws = ThisWorkbook.Worksheets("Devis Sing")
+    
+    ' Date du devis
+    If IsDate(ws.Range(DATE_CELL).Value) Then
+        d = CDate(ws.Range(DATE_CELL).Value)
+    Else
+        d = Date
+        ws.Range(DATE_CELL).Value = d
+    End If
+    
+    ' Génération de la référence : DEV2025/01/001
+    ws.Range(REF_CELL).Value = NextReference(ws, REF_CELL, d, "DEV")
+    
+    ' Nettoyage des champs
+    ws.Range("D25:D59").Value = ""
+    ws.Range("C25:C59").Value = ""
+    ws.Range("H25:H59").Value = ""
+    ws.Range("K25:K59").Value = ""
+    ws.Range("I25:I59").Value = ""
+    ws.Range("I25").Value = ""
+    ws.Range("D17").Value = ""
+    ws.Range("D22").Value = ""
+    ws.Range("D64").Value = ""
+    ws.Range("D67").Value = ""
+    ws.Range("K66").Value = ""
+End Sub
+
+'-------------------------------------------------------------
+' Annuler/Effacer le devis en cours
+'-------------------------------------------------------------
+Sub annuler_Devis_Sing()
+    With Sheets("Devis Sing")
+        .Range("D25:D59").Value = ""
+        .Range("C25:C59").Value = ""
+        .Range("H25:H59").Value = ""
+        .Range("K25:K59").Value = ""
+        .Range("I25:I59").Value = ""
+        .Range("I25").Value = ""
+        .Range("D17").Value = ""
+        .Range("D22").Value = ""
+        .Range("D64").Value = ""
+        .Range("D67").Value = ""
+        .Range("K66").Value = ""
+    End With
+End Sub
+
+'-------------------------------------------------------------
+' Exporter le devis en PDF
+' Sauvegarde dans le dossier configuré dans Parameters!K9
+'-------------------------------------------------------------
+Sub Devis_Sing_Imprimer()
+    On Error GoTo ErrHandler
+    
+    Dim wb As Workbook
+    Dim feuille As Worksheet
+    Dim plage As String
+    Dim nomDocument As String
+    Dim dossierAdresse As String
+    Dim fullPath As String
+    Dim iVis As XlSheetVisibility
+    
+    Set wb = ThisWorkbook
+    Set feuille = wb.Sheets("Devis Sing")
+    
+    '--- 1) VÉRIFICATION : Fichier Excel sauvegardé
+    If wb.Path = "" Then
+        MsgBox "Veuillez d'abord enregistrer le fichier Excel.", _
+               vbExclamation, "Fichier non enregistré"
+        Exit Sub
+    End If
+    
+    '--- 2) RÉCUPÉRATION DU DOSSIER depuis Parameters!K9
+    dossierAdresse = Trim$(wb.Sheets("Parameters").Range("K9").Value)
+    
+    If Len(dossierAdresse) = 0 Then
+        MsgBox "Le chemin du dossier des devis est vide (Parameters!K9).", _
+               vbCritical, "Export PDF"
+        Exit Sub
+    End If
+    
+    ' S'assurer qu'il se termine par "\"
+    If Right$(dossierAdresse, 1) <> "\" Then
+        dossierAdresse = dossierAdresse & "\"
+    End If
+    
+    ' Vérifier que le dossier existe
+    If Dir(dossierAdresse, vbDirectory) = "" Then
+        MsgBox "Le dossier suivant n'existe pas :" & vbCrLf & dossierAdresse & vbCrLf & vbCrLf & _
+               "Veuillez créer ce dossier ou modifier le chemin dans Parameters!K9", _
+               vbCritical, "Export PDF"
+        Exit Sub
+    End If
+    
+    '--- 3) CONSTRUCTION DU NOM DE FICHIER
+    nomDocument = Trim$(CStr(feuille.Range("K12").Value))
+    
+    If Len(nomDocument) = 0 Then
+        MsgBox "La référence du devis (K12) est vide." & vbCrLf & _
+               "Cliquez d'abord sur 'Nouveau Devis'.", _
+               vbCritical, "Export PDF"
+        Exit Sub
+    End If
+    
+    ' Nettoyer le nom de fichier (enlever les caractères interdits)
+    nomDocument = SanitizeFileName(nomDocument)
+    fullPath = dossierAdresse & nomDocument & ".pdf"
+    
+    '--- 4) CONFIGURATION DE LA PAGE
+    plage = "$B$6:$L$81"
+    
+    Application.ScreenUpdating = False
+    
+    With feuille.PageSetup
+        .PrintArea = plage
+        .FitToPagesTall = 1
+        .FitToPagesWide = 1
+        .LeftMargin = Application.InchesToPoints(0)
+        .RightMargin = Application.InchesToPoints(0)
+        .TopMargin = Application.InchesToPoints(0)
+        .BottomMargin = Application.InchesToPoints(0)
+    End With
+    
+    '--- 5) EXPORT PDF
+    With feuille
+        iVis = .Visible
+        .Visible = xlSheetVisible
+        .Activate
+        
+        .ExportAsFixedFormat Type:=xlTypePDF, _
+            Filename:=fullPath, _
+            Quality:=xlQualityStandard, _
+            IncludeDocProperties:=True, _
+            IgnorePrintAreas:=False, _
+            OpenAfterPublish:=True
+        
+        .Visible = iVis
+    End With
+    
+    Application.ScreenUpdating = True
+    
+    ' Message de confirmation
+    MsgBox "Devis exporté avec succès !" & vbCrLf & fullPath, _
+           vbInformation, "Export PDF"
+    
+    On Error GoTo 0
+    Exit Sub
+    
+ErrHandler:
+    Application.ScreenUpdating = True
+    MsgBox "Erreur lors de l'export du devis :" & vbCrLf & vbCrLf & _
+           "Erreur " & Err.Number & ": " & Err.Description & vbCrLf & vbCrLf & _
+           "Chemin tenté : " & fullPath, _
+           vbCritical, "Export PDF"
+    On Error GoTo 0
+End Sub
+
+
+'—————————————————————————————————————————————————————————
+'  DEVIS SING — Version définitive
+'—————————————————————————————————————————————————————————
+
+Public Sub GenererDevisDepuisPacks()
+
+    Dim wsD As Worksheet
+    Dim wsP As Worksheet
+    Dim tblP As ListObject
+    Dim tblD As ListObject
+    Dim dataP As Range
+    Dim dataD As Range
+    
+    Dim startRow As Long
+    Dim endRow As Long
+    Dim ligne As Long
+    Dim cell As Range
+    Dim codePack As String
+    Dim idx As Variant
+    Dim i As Long
+    
+    Dim descCourte As String
+    Dim prixUnit As Variant
+    Dim rngZone As Range
+    
+    On Error GoTo ErrHandler
+    
+    Set wsD = ThisWorkbook.Worksheets("Devis Sing")
+    Set wsP = ThisWorkbook.Worksheets("Parameters")
+    Set tblP = wsP.ListObjects("T_PACKS")
+    Set tblD = wsP.ListObjects("T_PACKS_DETAILS")
+    Set dataP = tblP.DataBodyRange
+    Set dataD = tblD.DataBodyRange
+    
+    startRow = 25
+    endRow = 59
+    
+    Set rngZone = wsD.Range("C" & startRow & ":K" & endRow)
+    
+    ' =============================================
+    ' NETTOYAGE TOTAL : défusionner + contenu + FORMAT
+    ' =============================================
+    On Error Resume Next
+    rngZone.UnMerge
+    On Error GoTo ErrHandler
+    
+    ' Supprimer TOUT : contenu ET formatage
+    rngZone.Clear
+    
+    ' Appliquer un style de base propre sur toute la zone
+    With rngZone
+        .Font.Name = "Tw Cen MT"
+        .Font.Size = 11
+        .Font.Bold = False
+        .Font.Color = RGB(0, 0, 0)
+        .Interior.Color = RGB(255, 255, 255)
+        .NumberFormat = "General"
+        .HorizontalAlignment = xlLeft
+    End With
+    ' Colonnes spécifiques : centrer C et I
+    wsD.Range("C" & startRow & ":C" & endRow).HorizontalAlignment = xlCenter
+    wsD.Range("I" & startRow & ":I" & endRow).HorizontalAlignment = xlCenter
+    ' Colonnes H et K : aligner à droite
+    wsD.Range("H" & startRow & ":H" & endRow).HorizontalAlignment = xlRight
+    wsD.Range("K" & startRow & ":K" & endRow).HorizontalAlignment = xlRight
+    
+    ' Remettre les bordures sur la zone
+    ' Bordures verticales colonnes C, G, H, I, K
+    Dim col As Variant
+    For Each col In Array("C", "H", "I")
+        With wsD.Range(col & startRow & ":" & col & endRow)
+            .Borders(xlEdgeLeft).LineStyle = xlContinuous
+            .Borders(xlEdgeLeft).Weight = xlThin
+            .Borders(xlEdgeRight).LineStyle = xlContinuous
+            .Borders(xlEdgeRight).Weight = xlThin
+        End With
+    Next col
+    ' Bordure gauche D et droite G (bloc description)
+    wsD.Range("D" & startRow & ":D" & endRow).Borders(xlEdgeLeft).LineStyle = xlContinuous
+    wsD.Range("D" & startRow & ":D" & endRow).Borders(xlEdgeLeft).Weight = xlThin
+    wsD.Range("G" & startRow & ":G" & endRow).Borders(xlEdgeRight).LineStyle = xlContinuous
+    wsD.Range("G" & startRow & ":G" & endRow).Borders(xlEdgeRight).Weight = xlThin
+    ' Bordures J-K
+    wsD.Range("J" & startRow & ":J" & endRow).Borders(xlEdgeLeft).LineStyle = xlContinuous
+    wsD.Range("J" & startRow & ":J" & endRow).Borders(xlEdgeLeft).Weight = xlThin
+    wsD.Range("K" & startRow & ":K" & endRow).Borders(xlEdgeRight).LineStyle = xlContinuous
+    wsD.Range("K" & startRow & ":K" & endRow).Borders(xlEdgeRight).Weight = xlThin
+    
+    ' =============================================
+    ' GÉNÉRATION DES DONNÉES + STYLE
+    ' =============================================
+    ligne = startRow
+    
+    For Each cell In wsD.Range("A19:A30")
+        codePack = Trim(CStr(cell.Value))
+        
+        If codePack <> "" Then
+            idx = Application.Match(codePack, dataP.Columns(1), 0)
+            
+            If Not IsError(idx) Then
+                descCourte = dataP.Cells(idx, 3).Value
+                prixUnit = dataP.Cells(idx, 4).Value
+                
+                ' === LIGNE PRINCIPALE ===
+                wsD.Cells(ligne, "C").Value = codePack
+                wsD.Cells(ligne, "D").Value = descCourte
+                wsD.Cells(ligne, "H").Value = prixUnit
+                wsD.Cells(ligne, "I").ClearContents
+                wsD.Cells(ligne, "K").FormulaR1C1 = "=IFERROR(RC[-3]*RC[-2],"""")"
+                
+                ' --- STYLE PRINCIPAL : GRAS, TAILLE 12 ---
+                With wsD.Range("C" & ligne & ":K" & ligne).Font
+                    .Bold = True
+                    .Size = 12
+                End With
+                wsD.Cells(ligne, "H").NumberFormat = "#,##0"" FCFA"""
+                wsD.Cells(ligne, "K").NumberFormat = "#,##0"" FCFA"""
+                
+                ligne = ligne + 1
+                
+                ' === LIGNES DE DÉTAILS (nombre variable) ===
+                For i = 1 To dataD.Rows.Count
+                    If CStr(dataD.Cells(i, 1).Value) = codePack Then
+                        wsD.Cells(ligne, "D").Value = dataD.Cells(i, 3).Value
+                        
+                        ' --- STYLE DÉTAIL : NORMAL, TAILLE 11 ---
+                        With wsD.Cells(ligne, "D").Font
+                            .Bold = False
+                            .Size = 11
+                            .Color = RGB(0, 0, 0)
+                        End With
+                        
+                        ligne = ligne + 1
+                    End If
+                Next i
+                
+            Else
+                wsD.Cells(ligne, "D").Value = "Code pack inconnu : " & codePack
+                ligne = ligne + 1
+            End If
+        End If
+    Next cell
+    
+    Exit Sub
+    
+ErrHandler:
+    MsgBox "Erreur lors de la génération du devis :" & vbCrLf & _
+           "Erreur " & Err.Number & ": " & Err.Description, _
+           vbCritical, "Génération Devis"
+End Sub
+

@@ -1,279 +1,246 @@
-import prisma from '../config/database.js';
 import PDFDocument from 'pdfkit';
 import { Readable } from 'stream';
+import prisma from '../config/database.js';
+import { formatCurrency } from './calculationService.js';
 
 /**
- * Service de génération de PDF
- * Équivalent VBA: Devis_Sing_Imprimer(), Facture_Enregistrer(), etc.
+ * Service de génération de PDF avec couleurs SING
+ * Reproduit la logique VBA d'export PDF
+ * 
+ * Couleurs officielles SING:
+ * - Primary (Pantone 228 C): #8E0B56 (Magenta/Rose)
+ * - Secondary (Pantone 606 C): #DFC52F (Jaune)
+ * - Accent (Pantone 3145 C): #00758D (Turquoise)
+ * - Tertiary (Pantone 7553 C): #5C4621 (Marron)
+ * - Complement (Pantone 547 C): #0C303C (Bleu foncé)
  */
-export class PDFService {
-  /**
-   * Génère un PDF pour un document
-   * @param documentId ID du document
-   * @returns Buffer du PDF
-   */
-  static async generateDocumentPDF(documentId: number): Promise<Buffer> {
-    // Récupérer le document complet
-    const document = await prisma.document.findUnique({
-      where: { id: documentId },
-      include: {
-        client: true,
-        lignes: {
-          include: {
-            produit: true
-          },
-          orderBy: {
-            id: 'asc'
-          }
+
+const SING_COLORS = {
+  primary: '#8E0B56',      // Pantone 228 C - Magenta/Rose
+  secondary: '#DFC52F',    // Pantone 606 C - Jaune
+  accent: '#00758D',       // Pantone 3145 C - Turquoise
+  tertiary: '#5C4621',     // Pantone 7553 C - Marron
+  complement: '#0C303C',   // Pantone 547 C - Bleu foncé
+  black: '#1D1D1B',        // Pantone Neutral Black C
+  gray: '#808080'
+};
+
+interface PDFGenerationOptions {
+  documentId: number;
+  type: 'DEVIS' | 'FACTURE' | 'AVOIR';
+}
+
+/**
+ * Générer un PDF pour un document
+ * @param options - Options de génération
+ * @returns Buffer du PDF
+ */
+export async function generateDocumentPDF(options: PDFGenerationOptions): Promise<Buffer> {
+  const { documentId } = options;
+
+  // Récupérer le document avec toutes ses relations
+  const document = await prisma.document.findUnique({
+    where: { id: documentId },
+    include: {
+      client: true,
+      lignes: {
+        include: {
+          produit: true
         }
       }
-    });
-
-    if (!document) {
-      throw new Error('Document non trouvé');
     }
+  });
 
-    // Récupérer les paramètres de l'entreprise
-    const parametres = await prisma.parametres.findUnique({
-      where: { id: 1 }
-    });
-
-    if (!parametres) {
-      throw new Error('Paramètres non trouvés');
-    }
-
-    return new Promise((resolve, reject) => {
-      try {
-        const doc = new PDFDocument({
-          size: 'A4',
-          margins: {
-            top: 50,
-            bottom: 50,
-            left: 50,
-            right: 50
-          }
-        });
-
-        const chunks: Buffer[] = [];
-
-        doc.on('data', (chunk) => chunks.push(chunk));
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
-        doc.on('error', reject);
-
-        // ============================================
-        // EN-TÊTE ENTREPRISE
-        // ============================================
-        doc.fontSize(20)
-           .font('Helvetica-Bold')
-           .text(parametres.nomEntreprise, { align: 'center' });
-
-        doc.fontSize(10)
-           .font('Helvetica')
-           .text(parametres.adresse, { align: 'center' })
-           .text(`Tél: ${parametres.telephone} | Email: ${parametres.email}`, { align: 'center' })
-           .text(`Site: ${parametres.siteWeb}`, { align: 'center' })
-           .moveDown();
-
-        doc.fontSize(9)
-           .text(`RCCM: ${parametres.rccm} | Capital: ${parametres.capital}`, { align: 'center' })
-           .moveDown(2);
-
-        // ============================================
-        // TYPE DE DOCUMENT
-        // ============================================
-        const typeLabels = {
-          DEVIS: 'DEVIS',
-          FACTURE: 'FACTURE',
-          AVOIR: 'AVOIR'
-        };
-
-        doc.fontSize(16)
-           .font('Helvetica-Bold')
-           .text(typeLabels[document.type], { align: 'center' })
-           .moveDown();
-
-        // ============================================
-        // INFORMATIONS DOCUMENT
-        // ============================================
-        const y = doc.y;
-
-        // Colonne gauche - Client
-        doc.fontSize(10)
-           .font('Helvetica-Bold')
-           .text('CLIENT', 50, y);
-
-        doc.font('Helvetica')
-           .text(document.client.nom, 50, y + 15)
-           .text(document.client.adresse || '', 50, y + 30)
-           .text(document.client.tel || '', 50, y + 45)
-           .text(document.client.email || '', 50, y + 60);
-
-        // Colonne droite - Infos document
-        doc.font('Helvetica-Bold')
-           .text('N° Document:', 350, y, { width: 100 })
-           .text('Date:', 350, y + 15, { width: 100 });
-
-        if (document.reference) {
-          doc.text('Référence:', 350, y + 30, { width: 100 });
-        }
-
-        doc.font('Helvetica')
-           .text(document.numero, 450, y)
-           .text(new Date(document.date).toLocaleDateString('fr-FR'), 450, y + 15);
-
-        if (document.reference) {
-          doc.text(document.reference, 450, y + 30);
-        }
-
-        doc.moveDown(6);
-
-        // ============================================
-        // TABLEAU DES LIGNES
-        // ============================================
-        const tableTop = doc.y;
-        const colCode = 50;
-        const colDesignation = 100;
-        const colQte = 380;
-        const colPrixUnit = 430;
-        const colTotal = 490;
-
-        // En-tête du tableau
-        doc.fontSize(9)
-           .font('Helvetica-Bold')
-           .text('Code', colCode, tableTop)
-           .text('Désignation', colDesignation, tableTop)
-           .text('Qté', colQte, tableTop)
-           .text('Prix Unit.', colPrixUnit, tableTop)
-           .text('Total HT', colTotal, tableTop);
-
-        // Ligne de séparation
-        doc.moveTo(50, tableTop + 15)
-           .lineTo(545, tableTop + 15)
-           .stroke();
-
-        let currentY = tableTop + 25;
-
-        // Lignes du document
-        for (const ligne of document.lignes) {
-          const code = ligne.produit?.code || '';
-          const designation = ligne.designation;
-          const quantite = ligne.quantite > 0 ? ligne.quantite.toString() : '';
-          const prixUnit = ligne.prixUnitaire > 0 
-            ? new Intl.NumberFormat('fr-FR').format(Number(ligne.prixUnitaire))
-            : '';
-          const total = ligne.totalHt > 0
-            ? new Intl.NumberFormat('fr-FR').format(Number(ligne.totalHt))
-            : '';
-
-          // Déterminer si c'est une ligne principale (avec code et prix)
-          const isMainLine = code !== '' && ligne.prixUnitaire > 0;
-
-          if (isMainLine) {
-            doc.font('Helvetica-Bold').fontSize(10);
-          } else {
-            doc.font('Helvetica').fontSize(9);
-          }
-
-          // Vérifier si on doit passer à une nouvelle page
-          if (currentY > 700) {
-            doc.addPage();
-            currentY = 50;
-          }
-
-          doc.text(code, colCode, currentY, { width: 40 })
-             .text(designation, colDesignation, currentY, { width: 270 })
-             .text(quantite, colQte, currentY, { width: 40, align: 'center' })
-             .text(prixUnit, colPrixUnit, currentY, { width: 50, align: 'right' })
-             .text(total, colTotal, currentY, { width: 50, align: 'right' });
-
-          currentY += isMainLine ? 20 : 15;
-        }
-
-        // ============================================
-        // TOTAUX
-        // ============================================
-        currentY += 20;
-
-        const totauxX = 400;
-        const montantsX = 490;
-
-        doc.font('Helvetica')
-           .fontSize(10)
-           .text('Solde HT:', totauxX, currentY)
-           .text(new Intl.NumberFormat('fr-FR').format(Number(document.soldeHt)) + ' FCFA', 
-                 montantsX, currentY, { align: 'right' });
-
-        currentY += 15;
-
-        if (Number(document.remise) > 0) {
-          doc.text('Remise (9,5%):', totauxX, currentY)
-             .text('- ' + new Intl.NumberFormat('fr-FR').format(Number(document.remise)) + ' FCFA', 
-                   montantsX, currentY, { align: 'right' });
-          currentY += 15;
-        }
-
-        doc.text('Sous-total:', totauxX, currentY)
-           .text(new Intl.NumberFormat('fr-FR').format(Number(document.sousTotal)) + ' FCFA', 
-                 montantsX, currentY, { align: 'right' });
-
-        currentY += 15;
-
-        doc.text('TPS (9,5%):', totauxX, currentY)
-           .text('- ' + new Intl.NumberFormat('fr-FR').format(Number(document.tps)) + ' FCFA', 
-                 montantsX, currentY, { align: 'right' });
-
-        currentY += 15;
-
-        doc.text('CSS (1%):', totauxX, currentY)
-           .text('- ' + new Intl.NumberFormat('fr-FR').format(Number(document.css)) + ' FCFA', 
-                 montantsX, currentY, { align: 'right' });
-
-        currentY += 20;
-
-        // Net à payer en gras
-        doc.font('Helvetica-Bold')
-           .fontSize(12)
-           .text('NET À PAYER:', totauxX, currentY)
-           .text(new Intl.NumberFormat('fr-FR').format(Number(document.netAPayer)) + ' FCFA', 
-                 montantsX, currentY, { align: 'right' });
-
-        // ============================================
-        // CONDITIONS DE PAIEMENT
-        // ============================================
-        if (document.conditionsPaiement) {
-          doc.moveDown(2)
-             .font('Helvetica')
-             .fontSize(9)
-             .text('Conditions de paiement:', 50)
-             .text(document.conditionsPaiement, 50, doc.y, { width: 500 });
-        }
-
-        // ============================================
-        // PIED DE PAGE - RIB
-        // ============================================
-        doc.fontSize(8)
-           .font('Helvetica')
-           .text('RIB UBA: ' + parametres.ribUba, 50, 750)
-           .text('RIB AFG: ' + parametres.ribAfg, 50, 765);
-
-        doc.end();
-      } catch (error) {
-        reject(error);
-      }
-    });
+  if (!document) {
+    throw new Error('Document non trouvé');
   }
 
-  /**
-   * Nettoie le nom de fichier (équivalent VBA: SanitizeFileName)
-   */
-  static sanitizeFileName(filename: string): string {
-    const badChars = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
-    let sanitized = filename;
-    
-    for (const char of badChars) {
-      sanitized = sanitized.replace(new RegExp('\\' + char, 'g'), '-');
-    }
-    
-    return sanitized;
+  // Récupérer les paramètres de l'entreprise
+  const parametres = await prisma.parametres.findUnique({
+    where: { id: 1 }
+  });
+
+  if (!parametres) {
+    throw new Error('Paramètres non trouvés');
   }
+
+  // Créer le document PDF
+  const doc = new PDFDocument({
+    size: 'A4',
+    margins: { top: 50, bottom: 50, left: 50, right: 50 }
+  });
+
+  // Buffer pour stocker le PDF
+  const chunks: Buffer[] = [];
+  doc.on('data', (chunk) => chunks.push(chunk));
+
+  // Bande de couleur SING en haut
+  doc.rect(0, 0, 595, 10).fill(SING_COLORS.primary);
+  doc.rect(0, 10, 595, 5).fill(SING_COLORS.secondary);
+  
+  doc.fillColor(SING_COLORS.black);
+  doc.moveDown(1);
+
+  // En-tête entreprise avec couleurs SING
+  doc.fontSize(20).font('Helvetica-Bold').fillColor(SING_COLORS.primary).text(parametres.nomEntreprise, { align: 'center' });
+  doc.fontSize(10).font('Helvetica').fillColor(SING_COLORS.black).text(parametres.adresse, { align: 'center' });
+  doc.text(`Tél: ${parametres.telephone} | Email: ${parametres.email}`, { align: 'center' });
+  doc.text(`RCCM: ${parametres.rccm} | Capital: ${parametres.capital}`, { align: 'center' });
+  doc.moveDown(2);
+
+  // Type de document avec couleur SING
+  const typeLabel = document.type === 'DEVIS' ? 'DEVIS' : 
+                    document.type === 'FACTURE' ? 'FACTURE' : 'AVOIR';
+  doc.fontSize(16).font('Helvetica-Bold').fillColor(SING_COLORS.accent).text(typeLabel, { align: 'center' });
+  doc.fontSize(12).fillColor(SING_COLORS.black).text(`N° ${document.numero}`, { align: 'center' });
+  doc.fontSize(10).text(`Date: ${new Date(document.date).toLocaleDateString('fr-FR')}`, { align: 'center' });
+  doc.moveDown(2);
+
+  // Informations client avec accent SING
+  doc.fontSize(12).font('Helvetica-Bold').fillColor(SING_COLORS.primary).text('CLIENT');
+  doc.fontSize(10).font('Helvetica').fillColor(SING_COLORS.black);
+  doc.text(document.client.nom);
+  if (document.client.adresse) doc.text(document.client.adresse);
+  if (document.client.tel) doc.text(`Tél: ${document.client.tel}`);
+  if (document.client.email) doc.text(`Email: ${document.client.email}`);
+  doc.moveDown(2);
+
+  // Référence si présente
+  if (document.reference) {
+    doc.fontSize(10).text(`Référence: ${document.reference}`);
+    doc.moveDown(1);
+  }
+
+  // Tableau des lignes
+  const tableTop = doc.y;
+  const colWidths = {
+    code: 60,
+    designation: 200,
+    qte: 50,
+    prixUnit: 80,
+    total: 80
+  };
+
+  // En-têtes du tableau avec couleur SING
+  doc.fontSize(10).font('Helvetica-Bold').fillColor(SING_COLORS.primary);
+  let x = 50;
+  doc.text('Code', x, tableTop);
+  x += colWidths.code;
+  doc.text('Désignation', x, tableTop);
+  x += colWidths.designation;
+  doc.text('Qté', x, tableTop);
+  x += colWidths.qte;
+  doc.text('Prix Unit.', x, tableTop);
+  x += colWidths.prixUnit;
+  doc.text('Total HT', x, tableTop);
+
+  // Ligne de séparation avec couleur SING
+  doc.strokeColor(SING_COLORS.accent).lineWidth(2);
+  doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+  doc.strokeColor(SING_COLORS.black).lineWidth(1);
+
+  // Lignes du document
+  let y = tableTop + 25;
+  doc.font('Helvetica').fontSize(9).fillColor(SING_COLORS.black);
+
+  for (const ligne of document.lignes) {
+    x = 50;
+    doc.text(ligne.produit.code, x, y, { width: colWidths.code });
+    x += colWidths.code;
+    doc.text(ligne.designation, x, y, { width: colWidths.designation });
+    x += colWidths.designation;
+    doc.text(ligne.quantite.toString(), x, y, { width: colWidths.qte, align: 'center' });
+    x += colWidths.qte;
+    doc.text(formatCurrency(Number(ligne.prixUnitaire)), x, y, { width: colWidths.prixUnit, align: 'right' });
+    x += colWidths.prixUnit;
+    doc.text(formatCurrency(Number(ligne.totalHt)), x, y, { width: colWidths.total, align: 'right' });
+    
+    y += 20;
+    
+    // Nouvelle page si nécessaire
+    if (y > 700) {
+      doc.addPage();
+      y = 50;
+    }
+  }
+
+  // Ligne de séparation
+  doc.strokeColor(SING_COLORS.accent).lineWidth(2);
+  doc.moveTo(50, y).lineTo(550, y).stroke();
+  doc.strokeColor(SING_COLORS.black).lineWidth(1);
+  y += 20;
+
+  // Totaux avec couleur SING
+  doc.fontSize(10).font('Helvetica-Bold').fillColor(SING_COLORS.black);
+  const totalsX = 400;
+  
+  doc.text('Solde HT:', totalsX, y);
+  doc.text(formatCurrency(Number(document.soldeHt)), totalsX + 120, y, { align: 'right' });
+  y += 20;
+
+  if (Number(document.remise) > 0) {
+    doc.text('Remise:', totalsX, y);
+    doc.text(`- ${formatCurrency(Number(document.remise))}`, totalsX + 120, y, { align: 'right' });
+    y += 20;
+  }
+
+  doc.text('Sous-total:', totalsX, y);
+  doc.text(formatCurrency(Number(document.sousTotal)), totalsX + 120, y, { align: 'right' });
+  y += 20;
+
+  doc.text('TPS (9,5%):', totalsX, y);
+  doc.text(`- ${formatCurrency(Number(document.tps))}`, totalsX + 120, y, { align: 'right' });
+  y += 20;
+
+  doc.text('CSS (1%):', totalsX, y);
+  doc.text(`- ${formatCurrency(Number(document.css))}`, totalsX + 120, y, { align: 'right' });
+  y += 20;
+
+  // Net à payer avec couleur SING
+  doc.fontSize(12).font('Helvetica-Bold').fillColor(SING_COLORS.primary);
+  doc.text('NET À PAYER:', totalsX, y);
+  doc.text(formatCurrency(Number(document.netAPayer)), totalsX + 120, y, { align: 'right' });
+  y += 30;
+  doc.fillColor(SING_COLORS.black);
+
+  // Conditions de paiement
+  if (document.conditionsPaiement) {
+    doc.fontSize(9).font('Helvetica');
+    doc.text('Conditions de paiement:', 50, y);
+    doc.text(document.conditionsPaiement, 50, y + 15, { width: 500 });
+    y += 40;
+  }
+
+  // RIB bancaires avec couleur SING
+  doc.fontSize(9).font('Helvetica-Bold').fillColor(SING_COLORS.primary);
+  doc.text('Coordonnées bancaires:', 50, y);
+  y += 15;
+  doc.font('Helvetica').fontSize(8).fillColor(SING_COLORS.black);
+  doc.text(`UBA Gabon: ${parametres.ribUba}`, 50, y);
+  y += 12;
+  doc.text(`AFG Bank: ${parametres.ribAfg}`, 50, y);
+
+  // Bande de couleur SING en bas
+  doc.rect(0, 832, 595, 5).fill(SING_COLORS.secondary);
+  doc.rect(0, 837, 595, 5).fill(SING_COLORS.primary);
+
+  // Finaliser le PDF
+  doc.end();
+
+  // Attendre que le PDF soit généré
+  return new Promise((resolve, reject) => {
+    doc.on('end', () => {
+      resolve(Buffer.concat(chunks));
+    });
+    doc.on('error', reject);
+  });
+}
+
+/**
+ * Générer le nom de fichier pour un document
+ */
+export function generateFileName(numero: string, type: string): string {
+  // Nettoyer les caractères interdits
+  const sanitized = numero.replace(/[\\/:*?"<>|]/g, '-');
+  return `${sanitized}.pdf`;
 }

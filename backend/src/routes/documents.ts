@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import prisma from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { DocumentService } from '../services/documentService.js';
-import { RecapService } from '../services/recapService.js';
-import { PDFService } from '../services/pdfService.js';
+import { calculateDocument } from '../services/calculationService.js';
+import { generateNextReference } from '../services/documentNumberService.js';
+import { generateDocumentPDF, generateFileName } from '../services/pdfService.js';
+import { createRecapFromFacture } from '../services/recapService.js';
 
 const router = Router();
 router.use(authenticateToken);
@@ -37,6 +38,148 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET statistiques
+router.get('/stats/summary', async (req, res) => {
+  try {
+    const [actives, payees, annulees] = await Promise.all([
+      prisma.document.count({ where: { type: 'FACTURE', statut: 'ACTIVE' } }),
+      prisma.document.count({ where: { type: 'FACTURE', statut: 'PAYEE' } }),
+      prisma.document.count({ where: { type: 'FACTURE', statut: 'ANNULEE' } })
+    ]);
+
+    const caActif = await prisma.document.aggregate({
+      where: { type: 'FACTURE', statut: 'ACTIVE' },
+      _sum: { netAPayer: true }
+    });
+
+    const caPaye = await prisma.document.aggregate({
+      where: { type: 'FACTURE', statut: 'PAYEE' },
+      _sum: { netAPayer: true }
+    });
+
+    const soldeDuTotal = await prisma.document.aggregate({
+      where: { type: 'FACTURE', statut: 'ACTIVE' },
+      _sum: { soldeDu: true }
+    });
+
+    res.json({
+      factures_actives: actives,
+      factures_payees: payees,
+      factures_annulees: annulees,
+      ca_actif: caActif._sum.netAPayer || 0,
+      solde_du_total: soldeDuTotal._sum.soldeDu || 0,
+      ca_paye: caPaye._sum.netAPayer || 0
+    });
+  } catch (error) {
+    console.error('Erreur GET stats:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST générer un nouveau numéro de document
+router.post('/generate-number', async (req, res) => {
+  try {
+    const { type, date } = req.body;
+
+    if (!type || !date) {
+      return res.status(400).json({ error: 'Type et date requis' });
+    }
+
+    const numero = await generateNextReference({
+      type: type as 'DEVIS' | 'FACTURE' | 'AVOIR',
+      date: new Date(date)
+    });
+
+    res.json({ numero });
+  } catch (error) {
+    console.error('Erreur génération numéro:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST calculer un document (avant création)
+router.post('/calculate', async (req, res) => {
+  try {
+    const { lignes, appliquerRemise = true } = req.body;
+
+    if (!lignes || !Array.isArray(lignes)) {
+      return res.status(400).json({ error: 'Lignes requises' });
+    }
+
+    const result = await calculateDocument(lignes, appliquerRemise);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Erreur calcul:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST créer une facture et alimenter le récap
+router.post('/facture-with-recap', async (req, res) => {
+  try {
+    const {
+      numero,
+      clientId,
+      date,
+      reference,
+      lignes,
+      appliquerRemise = true,
+      conditionsPaiement
+    } = req.body;
+
+    if (!numero || !clientId || !date || !lignes || lignes.length === 0) {
+      return res.status(400).json({ error: 'Champs requis manquants' });
+    }
+
+    // Calculer les montants
+    const calcul = await calculateDocument(lignes, appliquerRemise);
+
+    // Créer la facture
+    const facture = await prisma.document.create({
+      data: {
+        type: 'FACTURE',
+        numero,
+        clientId,
+        date: new Date(date),
+        reference,
+        soldeHt: calcul.soldeHt,
+        remise: calcul.remise,
+        sousTotal: calcul.sousTotal,
+        tps: calcul.tps,
+        css: calcul.css,
+        netAPayer: calcul.netAPayer,
+        soldeDu: calcul.soldeDu,
+        statut: 'ACTIVE',
+        conditionsPaiement,
+        lignes: {
+          create: calcul.lignes.map(ligne => ({
+            produitId: ligne.produitId,
+            designation: ligne.designation,
+            quantite: ligne.quantite,
+            prixUnitaire: ligne.prixUnitaire,
+            totalHt: ligne.totalHt
+          }))
+        }
+      },
+      include: {
+        lignes: true
+      }
+    });
+
+    // Créer l'entrée dans le récap (automatique)
+    const recapEntry = await createRecapFromFacture(facture.id);
+
+    res.status(201).json({
+      facture,
+      recapEntry
+    });
+  } catch (error: any) {
+    console.error('Erreur création facture:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // GET un document avec ses lignes
 router.get('/:id', async (req, res) => {
   try {
@@ -63,6 +206,36 @@ router.get('/:id', async (req, res) => {
     res.json(document);
   } catch (error) {
     console.error('Erreur GET document:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET générer PDF d'un document
+router.get('/:id/pdf', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const document = await prisma.document.findUnique({
+      where: { id: parseInt(id) },
+      select: { type: true, numero: true }
+    });
+
+    if (!document) {
+      return res.status(404).json({ error: 'Document non trouvé' });
+    }
+
+    const pdfBuffer = await generateDocumentPDF({
+      documentId: parseInt(id),
+      type: document.type as 'DEVIS' | 'FACTURE' | 'AVOIR'
+    });
+
+    const fileName = generateFileName(document.numero, document.type);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Erreur génération PDF:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -181,215 +354,4 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// GET statistiques
-router.get('/stats/summary', async (req, res) => {
-  try {
-    const [actives, payees, annulees, totals] = await Promise.all([
-      prisma.document.count({ where: { type: 'FACTURE', statut: 'ACTIVE' } }),
-      prisma.document.count({ where: { type: 'FACTURE', statut: 'PAYEE' } }),
-      prisma.document.count({ where: { type: 'FACTURE', statut: 'ANNULEE' } }),
-      prisma.document.aggregate({
-        where: { type: 'FACTURE' },
-        _sum: {
-          netAPayer: true,
-          soldeDu: true
-        }
-      })
-    ]);
-
-    const caActif = await prisma.document.aggregate({
-      where: { type: 'FACTURE', statut: 'ACTIVE' },
-      _sum: { netAPayer: true }
-    });
-
-    const caPaye = await prisma.document.aggregate({
-      where: { type: 'FACTURE', statut: 'PAYEE' },
-      _sum: { netAPayer: true }
-    });
-
-    const soldeDuTotal = await prisma.document.aggregate({
-      where: { type: 'FACTURE', statut: 'ACTIVE' },
-      _sum: { soldeDu: true }
-    });
-
-    res.json({
-      factures_actives: actives,
-      factures_payees: payees,
-      factures_annulees: annulees,
-      ca_actif: caActif._sum.netAPayer || 0,
-      solde_du_total: soldeDuTotal._sum.soldeDu || 0,
-      ca_paye: caPaye._sum.netAPayer || 0
-    });
-  } catch (error) {
-    console.error('Erreur GET stats:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
 export default router;
-
-
-// POST créer un document depuis des codes produits (logique VBA)
-router.post('/generate', async (req, res) => {
-  try {
-    const {
-      type,
-      clientId,
-      date,
-      reference,
-      conditionsPaiement,
-      codeProduits,
-      quantites,
-      appliquerRemise
-    } = req.body;
-
-    if (!type || !clientId || !codeProduits || !Array.isArray(codeProduits)) {
-      return res.status(400).json({ 
-        error: 'Champs requis: type, clientId, codeProduits (array)' 
-      });
-    }
-
-    // Créer le document avec la logique VBA
-    const document = await DocumentService.createDocument({
-      type,
-      clientId,
-      date: date ? new Date(date) : new Date(),
-      reference,
-      conditionsPaiement,
-      codeProduits,
-      quantites,
-      appliquerRemise
-    });
-
-    // Si c'est une facture, alimenter le récap automatiquement
-    if (type === 'FACTURE') {
-      await RecapService.alimenterDepuisFacture(document.id);
-    }
-
-    res.status(201).json(document);
-  } catch (error: any) {
-    console.error('Erreur POST generate document:', error);
-    res.status(500).json({ error: error.message || 'Erreur serveur' });
-  }
-});
-
-// GET générer le prochain numéro de document
-router.get('/next-number/:type', async (req, res) => {
-  try {
-    const { type } = req.params;
-    const { date } = req.query;
-
-    if (!['DEVIS', 'FACTURE', 'AVOIR'].includes(type)) {
-      return res.status(400).json({ error: 'Type invalide' });
-    }
-
-    const numero = await DocumentService.generateNextNumber(
-      type as 'DEVIS' | 'FACTURE' | 'AVOIR',
-      date ? new Date(date as string) : new Date()
-    );
-
-    res.json({ numero });
-  } catch (error) {
-    console.error('Erreur GET next-number:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// GET récapitulatif des factures
-router.get('/recap', async (req, res) => {
-  try {
-    const { dateDebut, dateFin, statut } = req.query;
-
-    const filters: any = {};
-    if (dateDebut) filters.dateDebut = new Date(dateDebut as string);
-    if (dateFin) filters.dateFin = new Date(dateFin as string);
-    if (statut) filters.statut = statut as string;
-
-    const recap = await RecapService.getRecapitulatif(filters);
-
-    res.json(recap);
-  } catch (error) {
-    console.error('Erreur GET recap:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// POST calculer les montants d'un document (preview)
-router.post('/calculate', async (req, res) => {
-  try {
-    const { soldeHt, appliquerRemise } = req.body;
-
-    if (soldeHt === undefined) {
-      return res.status(400).json({ error: 'soldeHt requis' });
-    }
-
-    // Récupérer les taux depuis les paramètres
-    const parametres = await prisma.parametres.findUnique({
-      where: { id: 1 }
-    });
-
-    const tauxRemise = parametres ? Number(parametres.tauxRemise) : 0.095;
-    const tauxTps = parametres ? Number(parametres.tauxTps) : 0.095;
-    const tauxCss = parametres ? Number(parametres.tauxCss) : 0.01;
-
-    const amounts = DocumentService.calculateAmounts(
-      Number(soldeHt),
-      tauxRemise,
-      tauxTps,
-      tauxCss,
-      appliquerRemise !== false
-    );
-
-    res.json(amounts);
-  } catch (error) {
-    console.error('Erreur POST calculate:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// GET prévisualiser les lignes depuis des codes produits
-router.post('/preview-lignes', async (req, res) => {
-  try {
-    const { codeProduits } = req.body;
-
-    if (!codeProduits || !Array.isArray(codeProduits)) {
-      return res.status(400).json({ error: 'codeProduits (array) requis' });
-    }
-
-    const lignes = await DocumentService.generateLignesFromProduits(codeProduits);
-
-    res.json(lignes);
-  } catch (error) {
-    console.error('Erreur POST preview-lignes:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-
-// GET générer le PDF d'un document
-router.get('/:id/pdf', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const pdfBuffer = await PDFService.generateDocumentPDF(parseInt(id));
-
-    // Récupérer le numéro du document pour le nom du fichier
-    const document = await prisma.document.findUnique({
-      where: { id: parseInt(id) },
-      select: { numero: true, type: true }
-    });
-
-    if (!document) {
-      return res.status(404).json({ error: 'Document non trouvé' });
-    }
-
-    const filename = PDFService.sanitizeFileName(document.numero) + '.pdf';
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(pdfBuffer);
-  } catch (error: any) {
-    console.error('Erreur GET PDF:', error);
-    res.status(500).json({ error: error.message || 'Erreur serveur' });
-  }
-});

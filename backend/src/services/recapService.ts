@@ -1,61 +1,136 @@
 import prisma from '../config/database.js';
+import { calculateByCategory } from './calculationService.js';
 
 /**
  * Service de gestion du récapitulatif
- * Équivalent VBA: AlimenterRecapDepuisFacture()
+ * Reproduit la logique VBA AlimenterRecapDepuisFacture()
  */
-export class RecapService {
-  /**
-   * Alimente le récapitulatif depuis une facture
-   * Cette fonction est appelée automatiquement lors de l'enregistrement d'une facture
-   */
-  static async alimenterDepuisFacture(factureId: number) {
-    // Récupérer la facture complète avec ses lignes et produits
-    const facture = await prisma.document.findUnique({
-      where: { id: factureId },
-      include: {
-        lignes: {
-          include: {
-            produit: true
-          }
-        },
-        client: true
-      }
-    });
 
-    if (!facture || facture.type !== 'FACTURE') {
-      throw new Error('Document non trouvé ou n\'est pas une facture');
-    }
+interface RecapEntry {
+  dateFacture: Date;
+  designation: string;
+  numeroFacture: string;
+  reference?: string;
+  montantsParCategorie: Map<string, number>;
+  soldeHt: number;
+  remise: number;
+  sousTotal: number;
+  tps: number;
+  css: number;
+  netAPayer: number;
+  soldeDu: number;
+  statut: string;
+}
 
-    // Grouper les montants par catégorie de produit
-    const montantsParCategorie: { [categorie: string]: number } = {};
-    let designation = '';
-
-    for (const ligne of facture.lignes) {
-      if (ligne.produit) {
-        const categorie = ligne.produit.categorie;
-        const montant = Number(ligne.totalHt);
-
-        if (!montantsParCategorie[categorie]) {
-          montantsParCategorie[categorie] = 0;
-        }
-        montantsParCategorie[categorie] += montant;
-
-        // Prendre la première désignation (DESC_COURTE)
-        if (!designation && ligne.produit.label) {
-          designation = ligne.produit.label;
+/**
+ * Créer une entrée dans le récapitulatif depuis une facture
+ * @param factureId - ID de la facture
+ */
+export async function createRecapFromFacture(factureId: number): Promise<RecapEntry> {
+  const facture = await prisma.document.findUnique({
+    where: { id: factureId },
+    include: {
+      client: true,
+      lignes: {
+        include: {
+          produit: true
         }
       }
     }
+  });
 
-    // Créer une entrée de récapitulatif
-    // Note: Vous devrez créer un modèle Recap dans Prisma
-    // Pour l'instant, on retourne les données structurées
-    const recapData = {
+  if (!facture) {
+    throw new Error('Facture non trouvée');
+  }
+
+  if (facture.type !== 'FACTURE') {
+    throw new Error('Le document doit être une facture');
+  }
+
+  // Calculer les montants par catégorie
+  const montantsParCategorie = await calculateByCategory(factureId);
+
+  // Récupérer la première désignation (description courte du premier produit)
+  const designation = facture.lignes.length > 0 
+    ? facture.lignes[0].produit.label 
+    : 'Facture';
+
+  const recapEntry: RecapEntry = {
+    dateFacture: facture.date,
+    designation,
+    numeroFacture: facture.numero,
+    reference: facture.reference || undefined,
+    montantsParCategorie,
+    soldeHt: Number(facture.soldeHt),
+    remise: Number(facture.remise),
+    sousTotal: Number(facture.sousTotal),
+    tps: Number(facture.tps),
+    css: Number(facture.css),
+    netAPayer: Number(facture.netAPayer),
+    soldeDu: Number(facture.soldeDu),
+    statut: facture.statut
+  };
+
+  return recapEntry;
+}
+
+/**
+ * Obtenir le récapitulatif de toutes les factures
+ * @param filters - Filtres optionnels
+ */
+export async function getRecapitulatif(filters?: {
+  dateDebut?: Date;
+  dateFin?: Date;
+  statut?: string;
+}) {
+  const where: any = {
+    type: 'FACTURE'
+  };
+
+  if (filters?.dateDebut || filters?.dateFin) {
+    where.date = {};
+    if (filters.dateDebut) {
+      where.date.gte = filters.dateDebut;
+    }
+    if (filters.dateFin) {
+      where.date.lte = filters.dateFin;
+    }
+  }
+
+  if (filters?.statut) {
+    where.statut = filters.statut;
+  }
+
+  const factures = await prisma.document.findMany({
+    where,
+    include: {
+      client: true,
+      lignes: {
+        include: {
+          produit: true
+        }
+      }
+    },
+    orderBy: {
+      date: 'desc'
+    }
+  });
+
+  // Créer les entrées de récapitulatif
+  const recapEntries: RecapEntry[] = [];
+
+  for (const facture of factures) {
+    const montantsParCategorie = await calculateByCategory(facture.id);
+    
+    const designation = facture.lignes.length > 0 
+      ? facture.lignes[0].produit.label 
+      : 'Facture';
+
+    recapEntries.push({
       dateFacture: facture.date,
       designation,
       numeroFacture: facture.numero,
-      numeroBC: facture.reference || '',
+      reference: facture.reference || undefined,
       montantsParCategorie,
       soldeHt: Number(facture.soldeHt),
       remise: Number(facture.remise),
@@ -65,146 +140,157 @@ export class RecapService {
       netAPayer: Number(facture.netAPayer),
       soldeDu: Number(facture.soldeDu),
       statut: facture.statut
-    };
-
-    return recapData;
+    });
   }
 
-  /**
-   * Récupère le récapitulatif complet
-   * Équivalent à la feuille "Recap Sing" dans Excel
-   */
-  static async getRecapitulatif(filters?: {
-    dateDebut?: Date;
-    dateFin?: Date;
-    statut?: string;
-  }) {
-    const where: any = {
-      type: 'FACTURE'
-    };
+  return recapEntries;
+}
 
-    if (filters?.dateDebut || filters?.dateFin) {
-      where.date = {};
-      if (filters.dateDebut) {
-        where.date.gte = filters.dateDebut;
-      }
-      if (filters.dateFin) {
-        where.date.lte = filters.dateFin;
-      }
+/**
+ * Obtenir les statistiques du récapitulatif
+ */
+export async function getRecapStatistics(filters?: {
+  dateDebut?: Date;
+  dateFin?: Date;
+}) {
+  const where: any = {
+    type: 'FACTURE'
+  };
+
+  if (filters?.dateDebut || filters?.dateFin) {
+    where.date = {};
+    if (filters.dateDebut) {
+      where.date.gte = filters.dateDebut;
     }
-
-    if (filters?.statut) {
-      where.statut = filters.statut;
+    if (filters.dateFin) {
+      where.date.lte = filters.dateFin;
     }
-
-    const factures = await prisma.document.findMany({
-      where,
-      include: {
-        lignes: {
-          include: {
-            produit: true
-          }
-        },
-        client: true
-      },
-      orderBy: {
-        date: 'desc'
-      }
-    });
-
-    // Transformer en format récapitulatif
-    const recap = factures.map(facture => {
-      // Grouper par catégorie
-      const montantsParCategorie: { [categorie: string]: number } = {};
-      let designation = '';
-
-      for (const ligne of facture.lignes) {
-        if (ligne.produit) {
-          const categorie = ligne.produit.categorie;
-          const montant = Number(ligne.totalHt);
-
-          if (!montantsParCategorie[categorie]) {
-            montantsParCategorie[categorie] = 0;
-          }
-          montantsParCategorie[categorie] += montant;
-
-          if (!designation && ligne.produit.label) {
-            designation = ligne.produit.label;
-          }
-        }
-      }
-
-      return {
-        id: facture.id,
-        dateFacture: facture.date,
-        designation,
-        numeroFacture: facture.numero,
-        numeroBC: facture.reference || '',
-        clientNom: facture.client.nom,
-        montantsParCategorie,
-        soldeHt: Number(facture.soldeHt),
-        remise: Number(facture.remise),
-        sousTotal: Number(facture.sousTotal),
-        tps: Number(facture.tps),
-        css: Number(facture.css),
-        netAPayer: Number(facture.netAPayer),
-        soldeDu: Number(facture.soldeDu),
-        statut: facture.statut
-      };
-    });
-
-    // Calculer les totaux par catégorie
-    const totauxParCategorie: { [categorie: string]: number } = {};
-    let totalSoldeHt = 0;
-    let totalRemise = 0;
-    let totalSousTotal = 0;
-    let totalTps = 0;
-    let totalCss = 0;
-    let totalNetAPayer = 0;
-    let totalSoldeDu = 0;
-
-    for (const ligne of recap) {
-      // Totaux par catégorie
-      for (const [categorie, montant] of Object.entries(ligne.montantsParCategorie)) {
-        if (!totauxParCategorie[categorie]) {
-          totauxParCategorie[categorie] = 0;
-        }
-        totauxParCategorie[categorie] += montant;
-      }
-
-      // Totaux généraux
-      totalSoldeHt += ligne.soldeHt;
-      totalRemise += ligne.remise;
-      totalSousTotal += ligne.sousTotal;
-      totalTps += ligne.tps;
-      totalCss += ligne.css;
-      totalNetAPayer += ligne.netAPayer;
-      totalSoldeDu += ligne.soldeDu;
-    }
-
-    return {
-      lignes: recap,
-      totaux: {
-        parCategorie: totauxParCategorie,
-        soldeHt: totalSoldeHt,
-        remise: totalRemise,
-        sousTotal: totalSousTotal,
-        tps: totalTps,
-        css: totalCss,
-        netAPayer: totalNetAPayer,
-        soldeDu: totalSoldeDu
-      }
-    };
   }
 
-  /**
-   * Exporte le récapitulatif en format Excel/CSV
-   */
-  static async exportRecap(format: 'excel' | 'csv' = 'excel') {
-    const recap = await this.getRecapitulatif();
+  const [totalFactures, facturesActives, facturesPayees, totaux, totalActif, totalPaye] = await Promise.all([
+    // Total de factures
+    prisma.document.count({ where }),
     
-    // TODO: Implémenter l'export Excel avec une librairie comme exceljs
-    // Pour l'instant, retourner les données brutes
-    return recap;
+    // Factures actives
+    prisma.document.count({ 
+      where: { ...where, statut: 'ACTIVE' } 
+    }),
+    
+    // Factures payées
+    prisma.document.count({ 
+      where: { ...where, statut: 'PAYEE' } 
+    }),
+    
+    // Totaux généraux
+    prisma.document.aggregate({
+      where,
+      _sum: {
+        soldeHt: true,
+        remise: true,
+        netAPayer: true,
+        soldeDu: true
+      }
+    }),
+    
+    // Total actif
+    prisma.document.aggregate({
+      where: { ...where, statut: 'ACTIVE' },
+      _sum: {
+        netAPayer: true,
+        soldeDu: true
+      }
+    }),
+    
+    // Total payé
+    prisma.document.aggregate({
+      where: { ...where, statut: 'PAYEE' },
+      _sum: {
+        netAPayer: true
+      }
+    })
+  ]);
+
+  // Calculer les montants par catégorie
+  const factures = await prisma.document.findMany({
+    where,
+    include: {
+      lignes: {
+        include: {
+          produit: true
+        }
+      }
+    }
+  });
+
+  const categoriesMap = new Map<string, number>();
+
+  for (const facture of factures) {
+    for (const ligne of facture.lignes) {
+      const category = ligne.produit.categorie;
+      const total = Number(ligne.totalHt);
+      
+      if (categoriesMap.has(category)) {
+        categoriesMap.set(category, categoriesMap.get(category)! + total);
+      } else {
+        categoriesMap.set(category, total);
+      }
+    }
   }
+
+  return {
+    totalFactures,
+    facturesActives,
+    facturesPayees,
+    facturesAnnulees: totalFactures - facturesActives - facturesPayees,
+    soldeHtTotal: Number(totaux._sum.soldeHt || 0),
+    remiseTotal: Number(totaux._sum.remise || 0),
+    netAPayerTotal: Number(totaux._sum.netAPayer || 0),
+    soldeDuTotal: Number(totaux._sum.soldeDu || 0),
+    caActif: Number(totalActif._sum.netAPayer || 0),
+    soldeDuActif: Number(totalActif._sum.soldeDu || 0),
+    caPaye: Number(totalPaye._sum.netAPayer || 0),
+    montantsParCategorie: Object.fromEntries(categoriesMap)
+  };
+}
+
+/**
+ * Exporter le récapitulatif en format CSV
+ */
+export function exportRecapToCSV(recapEntries: RecapEntry[]): string {
+  const headers = [
+    'Date',
+    'Désignation',
+    'N° Facture',
+    'Référence',
+    'Solde HT',
+    'Remise',
+    'Sous-total',
+    'TPS',
+    'CSS',
+    'Net à payer',
+    'Solde dû',
+    'Statut'
+  ];
+
+  const rows = recapEntries.map(entry => [
+    entry.dateFacture.toLocaleDateString('fr-FR'),
+    entry.designation,
+    entry.numeroFacture,
+    entry.reference || '',
+    entry.soldeHt.toString(),
+    entry.remise.toString(),
+    entry.sousTotal.toString(),
+    entry.tps.toString(),
+    entry.css.toString(),
+    entry.netAPayer.toString(),
+    entry.soldeDu.toString(),
+    entry.statut
+  ]);
+
+  const csvContent = [
+    headers.join(';'),
+    ...rows.map(row => row.join(';'))
+  ].join('\n');
+
+  return csvContent;
 }

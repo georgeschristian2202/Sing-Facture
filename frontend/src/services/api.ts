@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005/api';
 
 class ApiService {
   private token: string | null = null;
@@ -18,9 +18,9 @@ class ApiService {
   }
 
   private async request(endpoint: string, options: RequestInit = {}) {
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     if (this.token) {
@@ -50,10 +50,21 @@ class ApiService {
     return data;
   }
 
-  async register(email: string, password: string, nom: string) {
+  async register(userData: {
+    nom: string;
+    email: string;
+    password: string;
+    companyName: string;
+    companyEmail?: string;
+    telephone?: string;
+    adresse?: string;
+    rccm?: string;
+    capital?: string;
+    plan?: string;
+  }) {
     const data = await this.request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, nom }),
+      body: JSON.stringify(userData),
     });
     this.setToken(data.token);
     return data;
@@ -61,6 +72,10 @@ class ApiService {
 
   async getCurrentUser() {
     return this.request('/auth/me');
+  }
+
+  logout() {
+    this.clearToken();
   }
 
   // Clients
@@ -178,6 +193,91 @@ class ApiService {
     return this.request('/parametres', {
       method: 'PUT',
       body: JSON.stringify(parametres),
+    });
+  }
+
+  // Packs
+  async getPacks(params?: { actif?: boolean; sousService?: string }) {
+    const query = new URLSearchParams();
+    if (params?.actif !== undefined) query.append('actif', String(params.actif));
+    if (params?.sousService) query.append('sousService', params.sousService);
+    
+    const queryString = query.toString();
+    return this.request(`/packs${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getSousServices() {
+    return this.request('/packs/sous-services');
+  }
+
+  async getPack(id: number) {
+    return this.request(`/packs/${id}`);
+  }
+
+  async createPack(pack: any) {
+    return this.request('/packs', {
+      method: 'POST',
+      body: JSON.stringify(pack),
+    });
+  }
+
+  async updatePack(id: number, pack: any) {
+    return this.request(`/packs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(pack),
+    });
+  }
+
+  async deletePack(id: number) {
+    return this.request(`/packs/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Devis
+  async getDevis(params?: { statut?: string; clientId?: number; dateDebut?: string; dateFin?: string }) {
+    const query = new URLSearchParams();
+    if (params?.statut) query.append('statut', params.statut);
+    if (params?.clientId) query.append('clientId', String(params.clientId));
+    if (params?.dateDebut) query.append('dateDebut', params.dateDebut);
+    if (params?.dateFin) query.append('dateFin', params.dateFin);
+    
+    const queryString = query.toString();
+    return this.request(`/devis${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getDevisById(id: number) {
+    return this.request(`/devis/${id}`);
+  }
+
+  async getNumeroSuivantDevis(date?: string) {
+    const query = date ? `?date=${date}` : '';
+    return this.request(`/devis/numero-suivant${query}`);
+  }
+
+  async createDevis(devis: any) {
+    return this.request('/devis', {
+      method: 'POST',
+      body: JSON.stringify(devis),
+    });
+  }
+
+  async updateDevis(id: number, devis: any) {
+    return this.request(`/devis/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(devis),
+    });
+  }
+
+  async deleteDevis(id: number) {
+    return this.request(`/devis/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async convertirDevisEnBC(id: number) {
+    return this.request(`/devis/${id}/convertir-bc`, {
+      method: 'POST',
     });
   }
 }
