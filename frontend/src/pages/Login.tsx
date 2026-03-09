@@ -87,11 +87,10 @@ export default function Login() {
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '20px' }}>
             <label style={{
-              display: 'block',
+              display: 'flex',
               marginBottom: '8px',
               fontWeight: 600,
               color: SING_COLORS.neutral.gray[700],
-              display: 'flex',
               alignItems: 'center',
               gap: '8px'
             }}>
@@ -119,11 +118,10 @@ export default function Login() {
 
           <div style={{ marginBottom: '24px' }}>
             <label style={{
-              display: 'block',
+              display: 'flex',
               marginBottom: '8px',
               fontWeight: 600,
               color: SING_COLORS.neutral.gray[700],
-              display: 'flex',
               alignItems: 'center',
               gap: '8px'
             }}>

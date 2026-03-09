@@ -25,27 +25,40 @@
 
 ## 🔄 En cours / À faire
 
-### 1. Routes API Backend
-- 🔄 `GET /api/devis` - Liste des devis
-- 🔄 `GET /api/devis/:id` - Détails d'un devis
-- 🔄 `POST /api/devis` - Créer un devis
-- 🔄 `PUT /api/devis/:id` - Modifier un devis
-- 🔄 `DELETE /api/devis/:id` - Supprimer un devis
-- 🔄 `POST /api/devis/:id/pdf` - Générer PDF
-- 🔄 `POST /api/devis/:id/convertir-bc` - Convertir en BC
-- 🔄 `GET /api/devis/numero-suivant` - Prochain numéro
+### 1. Routes API Backend ✅ TERMINÉ
+- ✅ `GET /api/devis` - Liste des devis avec filtres
+- ✅ `GET /api/devis/:id` - Détails d'un devis avec client et représentants
+- ✅ `POST /api/devis` - Créer un devis avec calculs automatiques
+- ✅ `PUT /api/devis/:id` - Modifier un devis
+- ✅ `DELETE /api/devis/:id` - Supprimer un devis
+- ✅ `POST /api/devis/:id/convertir-bc` - Convertir en bon de commande
+- ✅ `GET /api/devis/numero-suivant` - Prochain numéro (DEV2025/01/001)
+- 🔄 `POST /api/devis/:id/pdf` - Générer PDF (à implémenter)
 
-### 2. Composant Frontend
-- 🔄 `DevisModule.tsx` - Composant principal (commencé)
-- 🔄 Vue liste des devis
-- 🔄 Formulaire création/édition
-- 🔄 Modal aperçu
-- 🔄 Gestion des lignes avec packs
-- 🔄 Calculs en temps réel
-- 🔄 Sélection client/représentant
-- 🔄 Modalités de paiement
+### 2. Composant Frontend ✅ TERMINÉ
+- ✅ `DevisModule.tsx` - Composant principal complet
+- ✅ Vue liste des devis avec recherche
+- ✅ Formulaire création/édition avec sections
+- ✅ Gestion des lignes avec packs
+- ✅ Calculs en temps réel (Solde HT, Remise, TPS, CSS, Net à payer)
+- ✅ Sélection client/représentant
+- ✅ Modalités de paiement
+- ✅ Modal sélection de packs
+- ✅ Ajout de lignes personnalisées
+- ✅ Conversion en bon de commande
+- ✅ Intégration dans DashboardNew
 
-### 3. Service PDF
+### 3. Service API Frontend ✅ TERMINÉ
+- ✅ Méthodes API ajoutées dans `api.ts`
+- ✅ `getDevis()` avec filtres
+- ✅ `getDevisById()`
+- ✅ `getNumeroSuivantDevis()`
+- ✅ `createDevis()`
+- ✅ `updateDevis()`
+- ✅ `deleteDevis()`
+- ✅ `convertirDevisEnBC()`
+
+### 4. Service PDF 🔄 À FAIRE
 - 🔄 Template HTML/CSS
 - 🔄 Génération côté serveur
 - 🔄 Logo entreprise
@@ -189,20 +202,26 @@ const calculerTotaux = (lignes: Ligne[], tauxRemise: number) => {
 
 ## 📝 Prochaines Actions
 
-### Priorité 1 (Urgent)
-1. Créer les routes API backend pour les devis
-2. Compléter le composant DevisModule.tsx
-3. Tester la création d'un devis simple
+### ✅ Terminé
+1. ✅ Routes API backend pour les devis
+2. ✅ Composant DevisModule.tsx complet
+3. ✅ Ajout de lignes depuis packs
+4. ✅ Calculs en temps réel
+5. ✅ Conversion en bon de commande
+6. ✅ Recherche et filtres
+7. ✅ Intégration dans le dashboard
 
-### Priorité 2 (Important)
-4. Implémenter l'ajout de lignes depuis packs
-5. Implémenter les calculs en temps réel
-6. Tester avec des données réelles
+### 🔄 Priorité 1 (À faire)
+1. Tester la création d'un devis avec données réelles
+2. Vérifier les calculs (TPS, CSS, remise)
+3. Tester l'ajout de packs
+4. Tester la conversion en BC
 
-### Priorité 3 (Nice to have)
-7. Générer le PDF
-8. Convertir en bon de commande
-9. Filtres et recherche avancés
+### 🔄 Priorité 2 (Nice to have)
+5. Générer le PDF du devis
+6. Ajouter des filtres avancés (date, montant)
+7. Ajouter la visualisation/aperçu du devis
+8. Ajouter l'export Excel
 
 ## 🎯 Objectif
 
@@ -218,5 +237,50 @@ Créer un module Devis moderne et fonctionnel qui:
 ---
 
 **Date**: 2025-01-XX
-**Statut**: Services backend prêts, composant frontend à compléter
-**Prochaine étape**: Créer les routes API et compléter le composant
+**Statut**: ✅ Module Devis fonctionnel et intégré
+**Prochaine étape**: Tests avec données réelles et génération PDF
+
+## 📦 Fichiers Créés/Modifiés
+
+### Backend
+- ✅ `backend/src/routes/devis.ts` - Routes API complètes
+- ✅ `backend/src/server.ts` - Route devis ajoutée
+- ✅ `backend/src/services/calculationService.ts` - Déjà existant et fonctionnel
+- ✅ `backend/src/services/documentNumberService.ts` - Déjà existant et fonctionnel
+
+### Frontend
+- ✅ `frontend/src/components/DevisModule.tsx` - Composant complet (400+ lignes)
+- ✅ `frontend/src/services/api.ts` - Méthodes API devis ajoutées
+- ✅ `frontend/src/pages/DashboardNew.tsx` - Intégration du module
+
+## 🎯 Fonctionnalités Implémentées
+
+1. **Liste des devis**
+   - Tableau avec colonnes: N°, Date, Client, Objet, Montant HT, Net à payer
+   - Recherche par numéro, client, objet
+   - Actions: Modifier, Convertir en BC, Supprimer
+
+2. **Création/Édition de devis**
+   - Section Informations: Client, Représentant, Date, N° auto, Objet
+   - Section Lignes: Ajout depuis packs ou personnalisé
+   - Section Totaux: Calculs en temps réel
+   - Section Modalités: Conditions de paiement
+
+3. **Gestion des lignes**
+   - Ajout depuis packs avec détails automatiques
+   - Ajout de lignes personnalisées
+   - Modification quantité et prix
+   - Suppression de lignes
+
+4. **Calculs automatiques**
+   - Solde HT = Σ (prix × quantité)
+   - Remise = 9.5% du Solde HT
+   - Sous-total = Solde HT - Remise
+   - TPS = 9.5% du Sous-total
+   - CSS = 1% du Sous-total
+   - Net à payer = Sous-total + TPS + CSS
+
+5. **Conversion en BC**
+   - Bouton de conversion dans la liste
+   - Crée un nouveau bon de commande avec les mêmes données
+   - Nouveau numéro BC2025/01/001

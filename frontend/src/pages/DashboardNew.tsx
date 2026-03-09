@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { SING_COLORS, SING_THEME } from '../config/colors';
 import ClientsModule from '../components/ClientsModule';
 import ProduitsModule from '../components/ProduitsModule';
+import DevisModuleComponent from '../components/DevisModule';
 import {
   LayoutDashboard,
   FileText,
@@ -216,7 +217,7 @@ export default function DashboardNew() {
         {/* Content Area */}
         <div>
           {activeMenu === 'dashboard' && <DashboardHome stats={stats} />}
-          {activeMenu === 'devis' && <DevisModule />}
+          {activeMenu === 'devis' && <DevisModuleComponent />}
           {activeMenu === 'commandes' && <CommandesModule />}
           {activeMenu === 'livraisons' && <LivraisonsModule />}
           {activeMenu === 'factures' && <FacturesModule />}
@@ -312,13 +313,6 @@ function DashboardHome({ stats }: { stats: Stats | null }) {
 }
 
 // Modules placeholder - à implémenter
-function DevisModule() {
-  return <div style={{ background: '#fff', padding: '24px', borderRadius: SING_THEME.borderRadius.lg }}>
-    <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Module Devis</h2>
-    <p>Liste et gestion des devis - En développement</p>
-  </div>;
-}
-
 function CommandesModule() {
   return <div style={{ background: '#fff', padding: '24px', borderRadius: SING_THEME.borderRadius.lg }}>
     <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Module Commandes</h2>
