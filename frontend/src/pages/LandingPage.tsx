@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SING_COLORS, SING_THEME } from '../config/colors';
+import SingLogo from '../components/SingLogo';
 import { 
   FileText, 
-  TrendingUp, 
-  Shield, 
-  Zap, 
-  Users, 
+  ShoppingCart,
+  Truck,
+  Receipt,
   BarChart3,
-  CheckCircle2,
+  CheckCircle,
   ArrowRight,
   Star,
   Menu,
-  X
+  X,
+  Zap,
+  Shield,
+  Users,
+  Globe
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -28,339 +31,446 @@ export default function LandingPage() {
   };
 
   return (
-    <div style={{ background: '#fff', minHeight: '100vh' }}>
-      {/* Navigation */}
-      <nav style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        background: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(0,0,0,0.1)',
-        padding: '16px 0',
-        zIndex: 1000,
-        boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-      }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <FileText size={32} color={SING_COLORS.primary.main} />
-            <span style={{ fontSize: '24px', fontWeight: 'bold', color: SING_COLORS.primary.main, fontFamily: SING_THEME.fonts.heading }}>
-              SING FacturePro
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-            <a href="#features" style={{ color: SING_COLORS.neutral.gray[700], textDecoration: 'none', fontWeight: 500 }}>Fonctionnalités</a>
-            <a href="#pricing" style={{ color: SING_COLORS.neutral.gray[700], textDecoration: 'none', fontWeight: 500 }}>Tarifs</a>
-            <a href="#faq" style={{ color: SING_COLORS.neutral.gray[700], textDecoration: 'none', fontWeight: 500 }}>FAQ</a>
+    <div className="bg-white min-h-screen">
+      {/* Fixed Navigation */}
+      <nav className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-gray-200 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-3">
+          <div className="flex justify-between items-center">
+            <SingLogo size="sm" />
+            
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-6 text-sm">
+              <a href="#fonctionnalites" className="text-gray-700 hover:text-[#00758D] transition-colors font-medium">
+                Fonctionnalités
+              </a>
+              <a href="#tarifs" className="text-gray-700 hover:text-[#00758D] transition-colors font-medium">
+                Tarifs
+              </a>
+              <a href="#contact" className="text-gray-700 hover:text-[#00758D] transition-colors font-medium">
+                Contact
+              </a>
+              <button
+                onClick={handleLogin}
+                className="px-4 py-2 text-gray-700 hover:text-[#00758D] transition-colors font-medium cursor-pointer"
+              >
+                Se connecter
+              </button>
+              <button
+                onClick={handleGetStarted}
+                className="px-5 py-2 bg-[#00758D] text-white rounded-xl font-semibold hover:bg-[#00303C] transition-colors cursor-pointer shadow-md"
+              >
+                Essai gratuit
+              </button>
+            </div>
+
+            {/* Mobile Menu Button */}
             <button
-              onClick={handleLogin}
-              style={{
-                padding: '10px 24px',
-                background: 'transparent',
-                color: SING_COLORS.primary.main,
-                border: `2px solid ${SING_COLORS.primary.main}`,
-                borderRadius: SING_THEME.borderRadius.md,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.3s'
-              }}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 text-[#00303C] cursor-pointer"
+              aria-label="Toggle menu"
             >
-              Connexion
-            </button>
-            <button
-              onClick={handleGetStarted}
-              style={{
-                padding: '10px 24px',
-                background: SING_COLORS.primary.main,
-                color: '#fff',
-                border: 'none',
-                borderRadius: SING_THEME.borderRadius.md,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.3s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              Commencer
-              <ArrowRight size={18} />
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
+
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <div className="md:hidden mt-4 pb-4 border-t border-gray-200 pt-4">
+              <div className="flex flex-col gap-4">
+                <a href="#fonctionnalites" className="text-gray-700 hover:text-[#00758D] transition-colors font-medium">
+                  Fonctionnalités
+                </a>
+                <a href="#tarifs" className="text-gray-700 hover:text-[#00758D] transition-colors font-medium">
+                  Tarifs
+                </a>
+                <a href="#contact" className="text-gray-700 hover:text-[#00758D] transition-colors font-medium">
+                  Contact
+                </a>
+                <button
+                  onClick={handleLogin}
+                  className="px-4 py-2 text-gray-700 hover:text-[#00758D] transition-colors font-medium cursor-pointer text-left"
+                >
+                  Se connecter
+                </button>
+                <button
+                  onClick={handleGetStarted}
+                  className="px-5 py-2 bg-[#00758D] text-white rounded-xl font-semibold hover:bg-[#00303C] transition-colors cursor-pointer"
+                >
+                  Essai gratuit
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section style={{
-        paddingTop: '120px',
-        paddingBottom: '80px',
-        background: `linear-gradient(135deg, ${SING_COLORS.primary.main}15 0%, ${SING_COLORS.secondary.main}15 100%)`
-      }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', textAlign: 'center' }}>
-          <h1 style={{
-            fontSize: '56px',
-            fontWeight: 'bold',
-            color: SING_COLORS.neutral.gray[900],
-            marginBottom: '24px',
-            lineHeight: '1.2',
-            fontFamily: SING_THEME.fonts.heading
-          }}>
-            Gérez votre facturation <br />
-            <span style={{ color: SING_COLORS.primary.main }}>en toute simplicité</span>
-          </h1>
-          <p style={{
-            fontSize: '20px',
-            color: SING_COLORS.neutral.gray[600],
-            marginBottom: '40px',
-            maxWidth: '700px',
-            margin: '0 auto 40px'
-          }}>
-            Solution complète de gestion de facturation pour les entreprises gabonaises. 
-            Devis, commandes, livraisons et factures en quelques clics.
-          </p>
-          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-            <button
-              onClick={handleGetStarted}
-              style={{
-                padding: '16px 40px',
-                background: SING_COLORS.primary.main,
-                color: '#fff',
-                border: 'none',
-                borderRadius: SING_THEME.borderRadius.lg,
-                fontSize: '18px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: SING_THEME.shadows.lg,
-                transition: 'all 0.3s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
-              }}
-            >
-              Essai gratuit 14 jours
-              <ArrowRight size={20} />
-            </button>
+      {/* Hero Section - Fond Teal Foncé */}
+      <section className="pt-24 pb-20 px-6 bg-gradient-to-br from-[#00303C] via-[#00758D] to-[#00303C] relative overflow-hidden">
+        {/* Décoration arrière-plan */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#DFC32F]/10 rounded-full blur-3xl translate-x-32 -translate-y-32" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#8E0B56]/10 rounded-full blur-3xl -translate-x-16 translate-y-16" />
+        
+        <div className="max-w-7xl mx-auto relative">
+          <div className="grid md:grid-cols-2 gap-16 items-center">
+            {/* Left Column - Content */}
+            <div>
+              <div className="inline-flex items-center gap-2 bg-[#DFC32F]/20 text-[#DFC32F] px-4 py-1.5 rounded-full text-sm font-semibold mb-6">
+                <Zap className="w-3.5 h-3.5" />
+                Solution SaaS N°1 pour la gestion commerciale en Afrique
+              </div>
+              <h1 className="text-4xl lg:text-6xl font-black text-white leading-tight mb-6">
+                Gérez votre<br />
+                <span className="text-[#DFC32F]">facturation</span><br />
+                comme un pro
+              </h1>
+              <p className="text-lg text-teal-100 mb-8 leading-relaxed max-w-lg">
+                De la création du devis à l'encaissement, SING-Facturation automatise tout votre cycle commercial. 
+                Calcul des taxes TPS/CSS, PDF professionnels, récapitulatifs financiers.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={handleGetStarted}
+                  className="inline-flex items-center justify-center gap-2 bg-[#DFC32F] text-[#00303C] font-bold px-8 py-4 rounded-2xl hover:bg-amber-300 transition-all shadow-lg text-lg cursor-pointer"
+                >
+                  Commencer gratuitement
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+                <a
+                  href="#fonctionnalites"
+                  className="inline-flex items-center justify-center gap-2 border-2 border-white/30 text-white font-medium px-8 py-4 rounded-2xl hover:bg-white/10 transition-all text-lg cursor-pointer"
+                >
+                  Voir les fonctionnalités
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </a>
+              </div>
+              <div className="mt-8 flex items-center gap-6 text-sm text-teal-200">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-[#DFC32F]" />
+                  Sans carte bancaire
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-[#DFC32F]" />
+                  14 jours d'essai
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-[#DFC32F]" />
+                  Résiliation libre
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Dashboard Mockup */}
+            <div className="hidden lg:block">
+              <div className="bg-white/10 backdrop-blur rounded-3xl p-6 border border-white/20 shadow-2xl">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                  <div className="flex-1 bg-white/10 rounded-full h-5 ml-2" />
+                </div>
+                {/* Fake dashboard */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    {['CA Total', 'Factures', 'Solde dû'].map((t, i) => (
+                      <div key={t} className="bg-white/10 rounded-xl p-3">
+                        <p className="text-xs text-teal-200 mb-1">{t}</p>
+                        <p className="text-white font-bold text-sm">{['2.4M FCFA', '24', '380K FCFA'][i]}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-white/10 rounded-xl p-3">
+                    <p className="text-xs text-teal-200 mb-2">Dernières factures</p>
+                    {['2026/03/001 — SING — 145 200 FCFA', '2026/03/002 — Pauline L. — 87 500 FCFA', '2026/02/030 — Gracia C. — 500 074 FCFA'].map(f => (
+                      <div key={f} className="flex items-center justify-between py-1.5 border-b border-white/10 last:border-0">
+                        <span className="text-white/80 text-xs">{f.split(' — ')[0]}</span>
+                        <span className="text-[#DFC32F] text-xs font-semibold">{f.split('— ').pop()}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-5 gap-1">
+                    {[40, 65, 50, 80, 60].map((h, i) => (
+                      <div key={i} className="bg-white/20 rounded-md" style={{ height: `${h}px` }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section style={{ padding: '60px 24px', background: '#fff' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '40px' }}>
-          {[
-            { icon: <Users size={40} />, value: '500+', label: 'Entreprises clientes', color: SING_COLORS.primary.main },
-            { icon: <FileText size={40} />, value: '50K+', label: 'Documents générés', color: SING_COLORS.secondary.main },
-            { icon: <TrendingUp size={40} />, value: '99.9%', label: 'Disponibilité', color: SING_COLORS.accent.main },
-            { icon: <Shield size={40} />, value: '100%', label: 'Sécurisé', color: SING_COLORS.complement.main }
-          ].map((stat, i) => (
-            <div key={i} style={{ textAlign: 'center' }}>
-              <div style={{ color: stat.color, marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
-                {stat.icon}
-              </div>
-              <div style={{ fontSize: '36px', fontWeight: 'bold', color: SING_COLORS.neutral.gray[900], marginBottom: '8px' }}>
-                {stat.value}
-              </div>
-              <div style={{ fontSize: '16px', color: SING_COLORS.neutral.gray[600] }}>
-                {stat.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" style={{ padding: '80px 24px', background: SING_COLORS.neutral.gray[50] }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '42px', fontWeight: 'bold', textAlign: 'center', marginBottom: '16px', color: SING_COLORS.neutral.gray[900] }}>
-            Fonctionnalités puissantes
-          </h2>
-          <p style={{ textAlign: 'center', fontSize: '18px', color: SING_COLORS.neutral.gray[600], marginBottom: '60px', maxWidth: '600px', margin: '0 auto 60px' }}>
-            Tout ce dont vous avez besoin pour gérer votre facturation professionnellement
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '32px' }}>
+      {/* Stats Section - Fond Teal Foncé */}
+      <section className="bg-[#00303C] py-12">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              {
-                icon: <FileText size={32} />,
-                title: 'Documents professionnels',
-                description: 'Créez des devis, bons de commande, bons de livraison et factures conformes aux normes gabonaises',
-                color: SING_COLORS.primary.main
-              },
-              {
-                icon: <Zap size={32} />,
-                title: 'Numérotation automatique',
-                description: 'Génération automatique des numéros de documents selon le format DEV2025/01/001',
-                color: SING_COLORS.secondary.main
-              },
-              {
-                icon: <BarChart3 size={32} />,
-                title: 'Calculs automatiques',
-                description: 'TPS 9.5%, CSS 1%, remises et totaux calculés automatiquement',
-                color: SING_COLORS.accent.main
-              },
-              {
-                icon: <Users size={32} />,
-                title: 'Gestion clients',
-                description: 'Base de données clients avec représentants et historique complet',
-                color: SING_COLORS.tertiary.main
-              },
-              {
-                icon: <TrendingUp size={32} />,
-                title: 'Récapitulatif financier',
-                description: 'Vue consolidée de toutes vos factures avec suivi des règlements',
-                color: SING_COLORS.complement.main
-              },
-              {
-                icon: <Shield size={32} />,
-                title: 'Sécurité & Conformité',
-                description: 'Données sécurisées, multi-tenant, conforme aux réglementations locales',
-                color: SING_COLORS.primary.light
-              }
-            ].map((feature, i) => (
-              <div key={i} style={{
-                background: '#fff',
-                padding: '32px',
-                borderRadius: SING_THEME.borderRadius.lg,
-                boxShadow: SING_THEME.shadows.md,
-                border: `2px solid ${feature.color}`,
-                transition: 'all 0.3s'
-              }}>
-                <div style={{ color: feature.color, marginBottom: '16px' }}>
-                  {feature.icon}
-                </div>
-                <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px', color: SING_COLORS.neutral.gray[900] }}>
-                  {feature.title}
-                </h3>
-                <p style={{ color: SING_COLORS.neutral.gray[600], lineHeight: '1.6' }}>
-                  {feature.description}
-                </p>
+              { value: '500+', label: 'Entreprises clientes' },
+              { value: '50K+', label: 'Factures générées' },
+              { value: '99.9%', label: 'Disponibilité' },
+              { value: '14j', label: "D'essai gratuit" },
+            ].map(s => (
+              <div key={s.label}>
+                <p className="text-3xl font-black text-[#DFC32F]">{s.value}</p>
+                <p className="text-teal-200 text-sm mt-1">{s.label}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" style={{ padding: '80px 24px', background: '#fff' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '42px', fontWeight: 'bold', textAlign: 'center', marginBottom: '16px', color: SING_COLORS.neutral.gray[900] }}>
-            Tarifs simples et transparents
-          </h2>
-          <p style={{ textAlign: 'center', fontSize: '18px', color: SING_COLORS.neutral.gray[600], marginBottom: '60px' }}>
-            Choisissez le plan qui correspond à vos besoins
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px', maxWidth: '1000px', margin: '0 auto' }}>
+      {/* Workflow Section - Fond Gris Clair */}
+      <section className="py-20 bg-[#EDEDED]">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-black text-[#00303C] mb-4">Un cycle commercial complet</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              De la prospection à l'encaissement, gérez chaque étape de votre processus commercial en quelques clics.
+            </p>
+          </div>
+          <div className="flex flex-col md:flex-row items-center justify-center gap-3">
+            {[
+              { label: 'Devis', icon: FileText, color: 'bg-[#00758D]' },
+              { label: 'Bon de Commande', icon: ShoppingCart, color: 'bg-[#8E0B56]' },
+              { label: 'Bon de Livraison', icon: Truck, color: 'bg-[#5C4621]' },
+              { label: 'Facture', icon: Receipt, color: 'bg-[#00303C]' },
+              { label: 'Récapitulatif', icon: BarChart3, color: 'bg-[#DFC32F]' },
+            ].map((step, i, arr) => {
+              const Icon = step.icon;
+              return (
+                <div key={step.label} className="flex items-center gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className={`w-16 h-16 rounded-2xl ${step.color} flex items-center justify-center shadow-lg`}>
+                      <Icon className="w-7 h-7 text-white" />
+                    </div>
+                    <span className="text-xs font-semibold text-[#00303C] mt-2 text-center">{step.label}</span>
+                  </div>
+                  {i < arr.length - 1 && <ArrowRight className="w-5 h-5 text-gray-400 flex-shrink-0 hidden md:block" />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section - Fond Blanc */}
+      <section id="fonctionnalites" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <span className="text-[#00758D] font-semibold text-sm uppercase tracking-wider">Fonctionnalités</span>
+            <h2 className="text-4xl font-black text-[#00303C] mt-2 mb-4">Tout ce dont vous avez besoin</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Une suite complète d'outils pour gérer votre activité commerciale avec professionnalisme.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                icon: FileText,
+                title: 'Devis Professionnels',
+                desc: 'Créez des devis en quelques clics, avec calcul automatique des taxes TPS/TVA et CSS.',
+                color: 'bg-[#00758D]/10 text-[#00758D]'
+              },
+              {
+                icon: ShoppingCart,
+                title: 'Bons de Commande',
+                desc: 'Convertissez un devis en bon de commande automatiquement en un clic.',
+                color: 'bg-[#8E0B56]/10 text-[#8E0B56]'
+              },
+              {
+                icon: Truck,
+                title: 'Bons de Livraison',
+                desc: 'Gérez vos livraisons et gardez une trace officielle de chaque prestation effectuée.',
+                color: 'bg-[#DFC32F]/20 text-[#5C4621]'
+              },
+              {
+                icon: Receipt,
+                title: 'Facturation Complète',
+                desc: 'Générez des factures conformes avec numérotation automatique et pied de page légal.',
+                color: 'bg-[#00303C]/10 text-[#00303C]'
+              },
+              {
+                icon: BarChart3,
+                title: 'Tableau Récapitulatif',
+                desc: 'Visualisez toutes vos factures avec ventilation par catégorie et suivi des paiements.',
+                color: 'bg-[#00758D]/10 text-[#00758D]'
+              },
+              {
+                icon: Globe,
+                title: 'Multi-tenant SaaS',
+                desc: 'Solution cloud accessible partout, avec séparation stricte des données par entreprise.',
+                color: 'bg-[#8E0B56]/10 text-[#8E0B56]'
+              },
+            ].map((f, i) => {
+              const Icon = f.icon;
+              return (
+                <div key={f.title} className="bg-white border border-gray-100 rounded-2xl p-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${f.color}`}>
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-bold text-[#00303C] text-lg mb-2">{f.title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Premium Features Section - Fond Teal Foncé */}
+      <section className="py-20 px-6 bg-gradient-to-br from-[#00303C] to-[#00758D] relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 right-10 w-64 h-64 rounded-full bg-[#DFC32F] blur-3xl" />
+        </div>
+        <div className="max-w-7xl mx-auto relative">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 bg-[#DFC32F]/20 text-[#DFC32F] px-4 py-1.5 rounded-full text-sm font-semibold mb-6">
+                <Star className="w-3.5 h-3.5" />
+                Fonctionnalités Premium
+              </div>
+              <h2 className="text-3xl font-black text-white mb-6">Personnalisez vos documents à votre image</h2>
+              <div className="space-y-4">
+                {[
+                  { title: 'Upload de votre modèle de facture', desc: 'Téléversez votre propre template de facture. L\'application génère vos documents sur la base de votre modèle existant.' },
+                  { title: 'Génération illimitée', desc: 'Créez autant de devis, bons de commande, bons de livraison et factures que vous voulez sans restriction.' },
+                  { title: 'Personnalisation complète', desc: 'Couleurs, logo, pied de page légal, RIB — tout est paramétrable pour correspondre à votre identité visuelle.' },
+                  { title: 'Exports & Rapports avancés', desc: 'Récapitulatif financier complet avec ventilation par catégorie et export des données.' },
+                ].map(item => (
+                  <div key={item.title} className="flex gap-4">
+                    <div className="w-10 h-10 bg-[#DFC32F]/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <CheckCircle className="w-5 h-5 text-[#DFC32F]" />
+                    </div>
+                    <div>
+                      <h4 className="text-white font-semibold">{item.title}</h4>
+                      <p className="text-teal-200 text-sm mt-0.5">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white/10 rounded-3xl p-8 border border-white/20">
+              <div className="flex items-center gap-3 mb-6">
+                <Shield className="w-6 h-6 text-[#DFC32F]" />
+                <span className="text-white font-bold text-lg">Plan Pro — Fonctionnalités incluses</span>
+              </div>
+              <div className="space-y-3">
+                {[
+                  'Factures & documents illimités',
+                  'Upload modèle de facture personnalisé',
+                  'PDF haute qualité avec votre logo',
+                  'RIB bancaire sur les documents',
+                  'Calcul automatique TPS + CSS',
+                  'Suivi paiements & soldes dus',
+                  'Récapitulatif financier complet',
+                  'Support prioritaire dédié'
+                ].map(item => (
+                  <div key={item} className="flex items-center gap-3">
+                    <CheckCircle className="w-5 h-5 text-[#DFC32F] flex-shrink-0" />
+                    <span className="text-white/90 text-sm">{item}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={handleGetStarted}
+                className="mt-8 w-full inline-flex items-center justify-center gap-2 bg-[#DFC32F] text-[#00303C] font-bold py-3.5 rounded-2xl hover:bg-amber-300 transition-colors cursor-pointer"
+              >
+                Activer le Premium
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section - Fond Gris Clair */}
+      <section id="tarifs" className="py-24 bg-[#EDEDED]">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <span className="text-[#00758D] font-semibold text-sm uppercase tracking-wider">Tarifs</span>
+            <h2 className="text-4xl font-black text-[#00303C] mt-2 mb-4">Des prix transparents</h2>
+            <p className="text-gray-600">Commencez gratuitement, évoluez selon vos besoins.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               {
                 name: 'Starter',
-                price: '25 000',
-                period: '/mois',
+                price: 'Gratuit',
+                priceDetail: '',
+                badge: null,
                 features: [
-                  '50 documents/mois',
-                  '5 utilisateurs',
+                  '5 factures / mois',
+                  '2 clients max',
+                  'Export PDF basique',
                   'Support email',
-                  'Exports PDF',
-                  'Gestion clients'
                 ],
-                color: SING_COLORS.secondary.main,
-                popular: false
+                cta: 'Commencer gratuitement',
+                ctaStyle: 'border-2 border-[#00758D] text-[#00758D] hover:bg-[#00758D] hover:text-white',
+                color: 'border-gray-200'
               },
               {
-                name: 'Business',
-                price: '50 000',
-                period: '/mois',
+                name: 'Pro',
+                price: '15 000',
+                priceDetail: 'FCFA / mois',
+                badge: 'Populaire',
                 features: [
-                  'Documents illimités',
-                  '15 utilisateurs',
+                  'Factures illimitées',
+                  'Clients illimités',
+                  'Export PDF haute qualité',
+                  'Modèle de facture personnalisé',
+                  'Upload de votre propre modèle',
                   'Support prioritaire',
-                  'Exports PDF & Excel',
                   'Récapitulatif avancé',
-                  'API access'
                 ],
-                color: SING_COLORS.primary.main,
-                popular: true
+                cta: 'Essai 14 jours gratuit',
+                ctaStyle: 'bg-[#00758D] text-white hover:bg-[#00303C]',
+                color: 'border-[#00758D]'
               },
               {
-                name: 'Enterprise',
-                price: 'Sur mesure',
-                period: '',
+                name: 'Entreprise',
+                price: '45 000',
+                priceDetail: 'FCFA / mois',
+                badge: null,
                 features: [
-                  'Tout Business +',
-                  'Utilisateurs illimités',
-                  'Support dédié 24/7',
-                  'Formation sur site',
-                  'Personnalisation',
-                  'SLA garanti'
+                  'Tout du plan Pro',
+                  'Multi-utilisateurs (10)',
+                  'API d\'intégration',
+                  'Modèles illimités',
+                  'Manager de compte dédié',
+                  'Formation équipe incluse',
+                  'SLA 99.9% uptime',
                 ],
-                color: SING_COLORS.accent.main,
-                popular: false
-              }
-            ].map((plan, i) => (
-              <div key={i} style={{
-                background: plan.popular ? `${plan.color}10` : '#fff',
-                padding: '40px',
-                borderRadius: SING_THEME.borderRadius.lg,
-                border: `3px solid ${plan.color}`,
-                boxShadow: plan.popular ? SING_THEME.shadows.xl : SING_THEME.shadows.md,
-                position: 'relative',
-                transform: plan.popular ? 'scale(1.05)' : 'scale(1)',
-                transition: 'all 0.3s'
-              }}>
-                {plan.popular && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '-12px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    background: plan.color,
-                    color: '#fff',
-                    padding: '6px 20px',
-                    borderRadius: SING_THEME.borderRadius.full,
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
-                    <Star size={16} fill="#fff" />
-                    Populaire
+                cta: 'Contacter les ventes',
+                ctaStyle: 'bg-[#DFC32F] text-[#00303C] hover:bg-amber-400 font-bold',
+                color: 'border-[#DFC32F]'
+              },
+            ].map(plan => (
+              <div key={plan.name} className={`bg-white rounded-3xl border-2 ${plan.color} p-8 hover:shadow-2xl transition-shadow relative`}>
+                {plan.badge && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#00758D] text-white text-xs font-bold px-4 py-1 rounded-full">
+                    {plan.badge}
                   </div>
                 )}
-                <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px', color: plan.color }}>
-                  {plan.name}
-                </h3>
-                <div style={{ marginBottom: '24px' }}>
-                  <span style={{ fontSize: '42px', fontWeight: 'bold', color: SING_COLORS.neutral.gray[900] }}>
-                    {plan.price}
-                  </span>
-                  <span style={{ fontSize: '18px', color: SING_COLORS.neutral.gray[600] }}>
-                    {plan.period}
-                  </span>
+                <h3 className="text-xl font-bold text-[#00303C] mb-1">{plan.name}</h3>
+                <div className="mb-6">
+                  <span className="text-4xl font-black text-[#00303C]">{plan.price}</span>
+                  {plan.priceDetail && <span className="text-gray-500 text-sm ml-1">{plan.priceDetail}</span>}
                 </div>
-                <ul style={{ listStyle: 'none', padding: 0, marginBottom: '32px' }}>
-                  {plan.features.map((feature, j) => (
-                    <li key={j} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                      <CheckCircle2 size={20} color={plan.color} />
-                      <span style={{ color: SING_COLORS.neutral.gray[700] }}>{feature}</span>
+                <ul className="space-y-3 mb-8">
+                  {plan.features.map(f => (
+                    <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
+                      <CheckCircle className="w-4 h-4 text-[#00758D] flex-shrink-0" />
+                      {f}
                     </li>
                   ))}
                 </ul>
                 <button
                   onClick={handleGetStarted}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    background: plan.popular ? plan.color : 'transparent',
-                    color: plan.popular ? '#fff' : plan.color,
-                    border: `2px solid ${plan.color}`,
-                    borderRadius: SING_THEME.borderRadius.md,
-                    fontSize: '16px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.3s'
-                  }}
+                  className={`w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl transition-colors text-sm font-semibold ${plan.ctaStyle} cursor-pointer`}
                 >
-                  Commencer
+                  {plan.cta}
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             ))}
@@ -368,100 +478,109 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section id="faq" style={{ padding: '80px 24px', background: SING_COLORS.neutral.gray[50] }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '42px', fontWeight: 'bold', textAlign: 'center', marginBottom: '60px', color: SING_COLORS.neutral.gray[900] }}>
-            Questions fréquentes
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Testimonials Section - Fond Blanc */}
+      <section className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-black text-[#00303C]">Ils nous font confiance</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               {
-                q: 'Comment fonctionne l\'essai gratuit ?',
-                a: 'Vous bénéficiez de 14 jours d\'essai gratuit sans carte bancaire. Toutes les fonctionnalités sont disponibles.'
+                name: 'Marie Obame',
+                role: 'Directrice Administrative, Tech Gabon',
+                text: 'SING-Facturation a transformé notre gestion commerciale. Les calculs automatiques TPS/CSS nous font gagner un temps précieux.'
               },
               {
-                q: 'Puis-je changer de plan à tout moment ?',
-                a: 'Oui, vous pouvez upgrader ou downgrader votre plan à tout moment. Les changements sont effectifs immédiatement.'
+                name: 'Jean-Pierre Mouloungui',
+                role: 'Gérant, Conseil & Stratégie Libreville',
+                text: 'La conversion automatique devis → facture est révolutionnaire. Plus d\'erreurs de saisie, nos clients reçoivent des documents impeccables.'
               },
               {
-                q: 'Les données sont-elles sécurisées ?',
-                a: 'Absolument. Nous utilisons un chiffrement SSL/TLS et vos données sont hébergées sur des serveurs sécurisés.'
+                name: 'Sandrine Mintsa',
+                role: 'Comptable, SOFITEX Gabon',
+                text: 'Le récapitulatif financier avec la ventilation par catégorie correspond exactement à ce que notre cabinet attendait.'
               },
-              {
-                q: 'Proposez-vous une formation ?',
-                a: 'Oui, nous offrons une formation complète pour tous les plans Business et Enterprise.'
-              }
-            ].map((faq, i) => (
-              <div key={i} style={{
-                background: '#fff',
-                padding: '24px',
-                borderRadius: SING_THEME.borderRadius.lg,
-                boxShadow: SING_THEME.shadows.sm
-              }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '12px', color: SING_COLORS.neutral.gray[900] }}>
-                  {faq.q}
-                </h3>
-                <p style={{ color: SING_COLORS.neutral.gray[600], lineHeight: '1.6' }}>
-                  {faq.a}
-                </p>
+            ].map(t => (
+              <div key={t.name} className="bg-[#EDEDED] rounded-2xl p-6 border border-gray-200">
+                <div className="flex mb-3">
+                  {[1,2,3,4,5].map(s => <Star key={s} className="w-4 h-4 text-[#DFC32F] fill-[#DFC32F]" />)}
+                </div>
+                <p className="text-gray-700 text-sm leading-relaxed mb-4">"{t.text}"</p>
+                <div>
+                  <p className="font-semibold text-[#00303C] text-sm">{t.name}</p>
+                  <p className="text-xs text-gray-500">{t.role}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section style={{
-        padding: '80px 24px',
-        background: `linear-gradient(135deg, ${SING_COLORS.primary.main} 0%, ${SING_COLORS.accent.main} 100%)`,
-        color: '#fff',
-        textAlign: 'center'
-      }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '42px', fontWeight: 'bold', marginBottom: '24px' }}>
-            Prêt à simplifier votre facturation ?
-          </h2>
-          <p style={{ fontSize: '20px', marginBottom: '40px', opacity: 0.9 }}>
-            Rejoignez des centaines d'entreprises qui font confiance à SING FacturePro
+      {/* CTA Final Section - Fond Teal Foncé */}
+      <section id="contact" className="py-20 bg-[#00303C]">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <h2 className="text-4xl font-black text-white mb-4">Prêt à simplifier votre facturation ?</h2>
+          <p className="text-teal-200 text-lg mb-10">
+            Rejoignez des centaines d'entreprises africaines qui font confiance à SING-Facturation.
           </p>
-          <button
-            onClick={handleGetStarted}
-            style={{
-              padding: '16px 40px',
-              background: '#fff',
-              color: SING_COLORS.primary.main,
-              border: 'none',
-              borderRadius: SING_THEME.borderRadius.lg,
-              fontSize: '18px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: SING_THEME.shadows.xl,
-              transition: 'all 0.3s',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}
-          >
-            Commencer gratuitement
-            <ArrowRight size={20} />
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={handleGetStarted}
+              className="inline-flex items-center gap-2 bg-[#DFC32F] text-[#00303C] font-bold px-10 py-4 rounded-2xl hover:bg-amber-300 transition-colors text-lg shadow-xl cursor-pointer"
+            >
+              Démarrer maintenant — C'est gratuit
+              <ArrowRight className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleLogin}
+              className="inline-flex items-center gap-2 border-2 border-white/30 text-white font-medium px-10 py-4 rounded-2xl hover:bg-white/10 transition-colors text-lg cursor-pointer"
+            >
+              Se connecter
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer style={{ padding: '40px 24px', background: SING_COLORS.neutral.gray[900], color: '#fff' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '24px' }}>
-            <FileText size={32} color={SING_COLORS.secondary.main} />
-            <span style={{ fontSize: '24px', fontWeight: 'bold' }}>SING FacturePro</span>
+      {/* Footer - Fond Très Foncé */}
+      <footer className="bg-[#1D1D1B] py-12 text-gray-400 text-sm">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            <div className="col-span-2">
+              <SingLogo size="md" />
+              <p className="mt-3 text-gray-500 max-w-xs">
+                Solution SaaS de gestion commerciale et facturation pour les entreprises africaines.
+              </p>
+              <p className="mt-2 text-xs text-gray-600">SING S.A. — RG LBV 2018B22204 — Libreville, GABON</p>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold mb-3">Produit</h4>
+              <ul className="space-y-2">
+                {['Fonctionnalités', 'Tarifs', 'Documentation', 'Changelog'].map(l => (
+                  <li key={l}>
+                    <a href="#" className="hover:text-[#DFC32F] transition-colors cursor-pointer">{l}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold mb-3">Entreprise</h4>
+              <ul className="space-y-2">
+                {['À propos', 'Contact', 'Politique de confidentialité', 'CGU'].map(l => (
+                  <li key={l}>
+                    <a href="#" className="hover:text-[#DFC32F] transition-colors cursor-pointer">{l}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <p style={{ color: SING_COLORS.neutral.gray[400], marginBottom: '16px' }}>
-            Solution de facturation professionnelle pour les entreprises gabonaises
-          </p>
-          <p style={{ color: SING_COLORS.neutral.gray[500], fontSize: '14px' }}>
-            © 2025 SING FacturePro. Tous droits réservés.
-          </p>
+          <div className="border-t border-gray-800 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p>© 2026 SING-Facturation. Tous droits réservés.</p>
+            <p className="text-xs flex items-center gap-1">
+              <Globe className="w-3 h-3" />
+              Conçu et développé pour l'Afrique
+            </p>
+          </div>
         </div>
       </footer>
     </div>

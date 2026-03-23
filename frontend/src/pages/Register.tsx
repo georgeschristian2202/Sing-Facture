@@ -1,583 +1,552 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { api } from '../services/api';
-import { SING_COLORS, SING_THEME } from '../config/colors';
-import { 
-  FileText, 
-  User, 
-  Mail, 
-  Lock, 
-  Building2, 
-  Phone, 
-  MapPin, 
-  FileCheck,
-  DollarSign,
-  AlertCircle,
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2
-} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, CheckCircle, Building2, User, Mail, Phone, MapPin, Globe, CreditCard } from 'lucide-react';
+import SingLogo from '../components/SingLogo';
+
+const steps = [
+  { id: 1, label: 'Compte', icon: User },
+  { id: 2, label: 'Entreprise', icon: Building2 },
+  { id: 3, label: 'Abonnement', icon: CreditCard },
+];
+
+const plans = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    price: 'Gratuit',
+    features: ['5 factures/mois', '2 clients max', 'Support email'],
+    color: 'border-gray-200',
+    selected: 'border-[#00758D] bg-[#00758D]/5',
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: '15 000 FCFA/mois',
+    features: ['Factures illimitées', 'Upload modèle perso', 'PDF haut de gamme', 'Support prioritaire'],
+    color: 'border-gray-200',
+    selected: 'border-[#00758D] bg-[#00758D]/5',
+    recommended: true,
+  },
+  {
+    id: 'entreprise',
+    name: 'Entreprise',
+    price: '45 000 FCFA/mois',
+    features: ['Tout du Pro', 'Multi-utilisateurs', 'API + Manager dédié'],
+    color: 'border-gray-200',
+    selected: 'border-[#00758D] bg-[#00758D]/5',
+  },
+];
 
 export default function Register() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    // Données utilisateur
-    nom: '',
+  const [showPassword, setShowPassword] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState('starter');
+  const [form, setForm] = useState({
+    // Compte
+    nom_complet: '',
     email: '',
-    password: '',
-    confirmPassword: '',
-    // Données entreprise
-    companyName: '',
-    companyEmail: '',
     telephone: '',
-    adresse: '',
+    password: '',
+    confirm_password: '',
+    // Entreprise
+    nom_entreprise: '',
+    secteur_activite: '',
+    adresse_entreprise: '',
+    ville: '',
+    pays: 'Gabon',
+    telephone_entreprise: '',
+    email_entreprise: '',
+    site_web: '',
     rccm: '',
+    num_statistique: '',
     capital: '',
-    plan: 'STARTER'
+    num_impot: '',
+    forme_juridique: '',
+    // Abonnement
+    plan: 'starter',
   });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleNext = () => {
-    setError('');
-    
-    if (step === 1) {
-      if (!formData.nom || !formData.email || !formData.password) {
-        setError('Veuillez remplir tous les champs obligatoires');
-        return;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        setError('Les mots de passe ne correspondent pas');
-        return;
-      }
-      if (formData.password.length < 6) {
-        setError('Le mot de passe doit contenir au moins 6 caractères');
-        return;
-      }
-    }
-    
-    setStep(step + 1);
-  };
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const secteurs = [
+    'Technologie / Informatique',
+    'Conseil & Stratégie',
+    'BTP / Immobilier',
+    'Commerce & Distribution',
+    'Santé & Médical',
+    'Éducation & Formation',
+    'Industrie & Manufacture',
+    'Transport & Logistique',
+    'Hôtellerie & Restauration',
+    'Agriculture & Agroalimentaire',
+    'Communication & Médias',
+    'Finance & Assurance',
+    'Autre',
+  ];
+
+  const formes = [
+    'SARL',
+    'SA',
+    'SAS',
+    'SASU',
+    'EURL',
+    'SNC',
+    'GIE',
+    'Entreprise individuelle',
+    'Association',
+    'ONG',
+    'Autre'
+  ];
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
-
-    if (!formData.companyName) {
-      setError('Le nom de l\'entreprise est requis');
-      return;
+    if (step < 3) {
+      setStep(s => s + 1);
+    } else {
+      // TODO: Appel API pour créer le compte
+      console.log('Form data:', form);
+      navigate('/login');
     }
+  }
 
-    setLoading(true);
-
-    try {
-      const response = await fetch('http://localhost:5005/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nom: formData.nom,
-          email: formData.email,
-          password: formData.password,
-          companyName: formData.companyName,
-          companyEmail: formData.companyEmail || formData.email,
-          telephone: formData.telephone,
-          adresse: formData.adresse,
-          rccm: formData.rccm,
-          capital: formData.capital,
-          plan: formData.plan
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de l\'inscription');
-      }
-
-      api.setToken(data.token);
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Erreur lors de l\'inscription');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const inputClass = "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00758D]/30 focus:border-[#00758D] transition-all bg-white";
+  const labelClass = "block text-xs font-semibold text-gray-600 mb-1";
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: SING_COLORS.gradients.hero,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px'
-    }}>
-      <div style={{
-        background: '#fff',
-        borderRadius: SING_THEME.borderRadius.xl,
-        padding: '48px',
-        maxWidth: '600px',
-        width: '100%',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-      }}>
-        {/* Logo et titre */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎉</div>
-          <h1 style={{
-            fontSize: '28px',
-            fontWeight: 'bold',
-            color: SING_COLORS.primary.main,
-            marginBottom: '8px',
-            fontFamily: SING_THEME.fonts.heading
-          }}>
-            Créer votre compte
-          </h1>
-          <p style={{ color: SING_COLORS.neutral.gray[600] }}>
-            Étape {step} sur 2 - {step === 1 ? 'Informations personnelles' : 'Informations entreprise'}
-          </p>
+    <div className="min-h-screen flex">
+      {/* LEFT — Cover Image */}
+      <div className="hidden lg:flex lg:w-[45%] bg-gradient-to-br from-[#00303C] via-[#00758D] to-[#8E0B56] relative overflow-hidden flex-col justify-between p-12">
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-[#DFC32F]/10 rounded-full blur-3xl -translate-x-32 -translate-y-32" />
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-[#8E0B56]/20 rounded-full blur-3xl translate-x-16 translate-y-16" />
         </div>
 
-        {/* Progress bar */}
-        <div style={{
-          height: '4px',
-          background: SING_COLORS.neutral.gray[200],
-          borderRadius: '2px',
-          marginBottom: '32px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            height: '100%',
-            background: SING_COLORS.primary.main,
-            width: `${(step / 2) * 100}%`,
-            transition: 'width 0.3s'
-          }} />
+        <div className="relative z-10">
+          <SingLogo size="lg" />
         </div>
 
-        {/* Erreur */}
-        {error && (
-          <div style={{
-            padding: '12px',
-            background: '#fee2e2',
-            border: '1px solid #ef4444',
-            borderRadius: SING_THEME.borderRadius.md,
-            color: '#dc2626',
-            marginBottom: '24px',
-            fontSize: '14px'
-          }}>
-            {error}
+        <div className="relative z-10 space-y-6">
+          <h2 className="text-3xl font-black text-white leading-tight">
+            Gérez toute votre facturation depuis un seul endroit
+          </h2>
+          <div className="space-y-3">
+            {[
+              'Devis, Bons de commande, Factures',
+              'Calcul automatique TPS + CSS',
+              'Templates PDF professionnels',
+              'Suivi des paiements en temps réel'
+            ].map(item => (
+              <div key={item} className="flex items-center gap-3 text-teal-100 text-sm">
+                <CheckCircle className="w-4 h-4 text-[#DFC32F] flex-shrink-0" />
+                <span>{item}</span>
+              </div>
+            ))}
           </div>
-        )}
+          <div className="bg-white/10 rounded-2xl p-4 border border-white/20">
+            <p className="text-white/80 text-sm italic">
+              "SING-Facturation nous a permis de diviser par 3 le temps passé sur notre comptabilité client."
+            </p>
+            <p className="text-[#DFC32F] font-semibold text-xs mt-2">— Marie Obame, Tech Gabon</p>
+          </div>
+        </div>
 
-        {/* Étape 1 - Informations personnelles */}
-        {step === 1 && (
-          <form onSubmit={(e) => { e.preventDefault(); handleNext(); }}>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: 600,
-                color: SING_COLORS.neutral.gray[700]
-              }}>
-                Nom complet <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.nom}
-                onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                placeholder="Ex: Jean Dupont"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
-            </div>
+        <div className="relative z-10">
+          <p className="text-teal-200/60 text-xs">© 2026 SING-Facturation • Libreville, Gabon</p>
+        </div>
+      </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: 600,
-                color: SING_COLORS.neutral.gray[700]
-              }}>
-                Email <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="votre@email.com"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
-            </div>
+      {/* RIGHT — Form */}
+      <div className="flex-1 flex flex-col overflow-y-auto bg-white">
+        <div className="flex-1 flex flex-col justify-center max-w-2xl mx-auto w-full px-8 py-12">
+          {/* Mobile logo */}
+          <div className="lg:hidden mb-8">
+            <SingLogo size="md" />
+          </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: 600,
-                color: SING_COLORS.neutral.gray[700]
-              }}>
-                Mot de passe <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="password"
-                required
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Minimum 6 caractères"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
-            </div>
+          {/* Progress steps */}
+          <div className="flex items-center gap-2 mb-8">
+            {steps.map((s, i) => {
+              const Icon = s.icon;
+              const isActive = step === s.id;
+              const isDone = step > s.id;
+              return (
+                <div key={s.id} className="flex items-center gap-2">
+                  <div
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      isDone
+                        ? 'bg-[#00758D] text-white'
+                        : isActive
+                        ? 'bg-[#00303C] text-white'
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    {isDone ? <CheckCircle className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
+                    {s.label}
+                  </div>
+                  {i < steps.length - 1 && (
+                    <div className={`h-0.5 w-8 rounded-full ${step > s.id ? 'bg-[#00758D]' : 'bg-gray-200'}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: 600,
-                color: SING_COLORS.neutral.gray[700]
-              }}>
-                Confirmer le mot de passe <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                placeholder="Retapez votre mot de passe"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
-            </div>
+          <h1 className="text-2xl font-black text-[#00303C] mb-1">
+            {step === 1 && 'Créez votre compte'}
+            {step === 2 && 'Votre entreprise'}
+            {step === 3 && 'Choisissez votre plan'}
+          </h1>
+          <p className="text-gray-500 text-sm mb-8">
+            {step === 1 && 'Informations de connexion à votre espace personnel'}
+            {step === 2 && 'Ces informations apparaîtront sur vos documents commerciaux'}
+            {step === 3 && 'Commencez gratuitement, évoluez selon vos besoins'}
+          </p>
 
-            <button
-              type="submit"
-              style={{
-                width: '100%',
-                padding: '14px',
-                background: SING_COLORS.primary.main,
-                color: '#fff',
-                border: 'none',
-                borderRadius: SING_THEME.borderRadius.md,
-                fontSize: '16px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              Continuer →
-            </button>
-          </form>
-        )}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* STEP 1 — Compte */}
+            {step === 1 && (
+              <div className="space-y-4">
+                <div>
+                  <label className={labelClass}>Nom complet *</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      value={form.nom_complet}
+                      onChange={e => set('nom_complet', e.target.value)}
+                      required
+                      placeholder="Jean Dupont"
+                      className={`${inputClass} pl-9`}
+                    />
+                  </div>
+                </div>
 
-        {/* Étape 2 - Informations entreprise */}
-        {step === 2 && (
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: 600,
-                color: SING_COLORS.neutral.gray[700]
-              }}>
-                Nom de l'entreprise <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.companyName}
-                onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                placeholder="Ex: SING S.A."
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
-            </div>
+                <div>
+                  <label className={labelClass}>Adresse email *</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={e => set('email', e.target.value)}
+                      required
+                      placeholder="jean@entreprise.com"
+                      className={`${inputClass} pl-9`}
+                    />
+                  </div>
+                </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: 600,
-                color: SING_COLORS.neutral.gray[700]
-              }}>
-                Email entreprise
-              </label>
-              <input
-                type="email"
-                value={formData.companyEmail}
-                onChange={(e) => setFormData({ ...formData, companyEmail: e.target.value })}
-                placeholder="contact@entreprise.com"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
-              <small style={{ color: SING_COLORS.neutral.gray[500], fontSize: '12px' }}>
-                Laissez vide pour utiliser votre email personnel
-              </small>
-            </div>
+                <div>
+                  <label className={labelClass}>Téléphone *</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      value={form.telephone}
+                      onChange={e => set('telephone', e.target.value)}
+                      required
+                      placeholder="+241 XX XX XX XX"
+                      className={`${inputClass} pl-9`}
+                    />
+                  </div>
+                </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: 600,
-                color: SING_COLORS.neutral.gray[700]
-              }}>
-                Téléphone
-              </label>
-              <input
-                type="tel"
-                value={formData.telephone}
-                onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-                placeholder="+241 XX XX XX XX"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
-            </div>
+                <div>
+                  <label className={labelClass}>Mot de passe *</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={form.password}
+                      onChange={e => set('password', e.target.value)}
+                      required
+                      placeholder="Min. 8 caractères"
+                      className={`${inputClass} pr-10`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: 600,
-                color: SING_COLORS.neutral.gray[700]
-              }}>
-                Adresse
-              </label>
-              <textarea
-                value={formData.adresse}
-                onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
-                placeholder="Adresse complète de l'entreprise"
-                rows={2}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  resize: 'vertical'
-                }}
-                onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-              <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '8px',
-                  fontWeight: 600,
-                  color: SING_COLORS.neutral.gray[700]
-                }}>
-                  RCCM
-                </label>
-                <input
-                  type="text"
-                  value={formData.rccm}
-                  onChange={(e) => setFormData({ ...formData, rccm: e.target.value })}
-                  placeholder="Ex: GA-LBV-01-2024-XXX"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: SING_THEME.borderRadius.md,
-                    fontSize: '16px',
-                    outline: 'none'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                  onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-                />
+                <div>
+                  <label className={labelClass}>Confirmer le mot de passe *</label>
+                  <input
+                    type="password"
+                    value={form.confirm_password}
+                    onChange={e => set('confirm_password', e.target.value)}
+                    required
+                  
+                    className={inputClass}
+                  />
+                  {form.confirm_password && form.password !== form.confirm_password && (
+                    <p className="text-red-500 text-xs mt-1">Les mots de passe ne correspondent pas</p>
+                  )}
+                </div>
               </div>
+            )}
 
-              <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '8px',
-                  fontWeight: 600,
-                  color: SING_COLORS.neutral.gray[700]
-                }}>
-                  Capital
-                </label>
-                <input
-                  type="text"
-                  value={formData.capital}
-                  onChange={(e) => setFormData({ ...formData, capital: e.target.value })}
-                  placeholder="Ex: 10 000 000 FCFA"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: SING_THEME.borderRadius.md,
-                    fontSize: '16px',
-                    outline: 'none'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                  onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-                />
+            {/* STEP 2 — Entreprise */}
+            {step === 2 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className={labelClass}>Nom de l'entreprise *</label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        value={form.nom_entreprise}
+                        onChange={e => set('nom_entreprise', e.target.value)}
+                        required
+                        placeholder="ACME S.A."
+                        className={`${inputClass} pl-9`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Forme juridique *</label>
+                    <select
+                      value={form.forme_juridique}
+                      onChange={e => set('forme_juridique', e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Sélectionner...</option>
+                      {formes.map(f => (
+                        <option key={f}>{f}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Secteur d'activité *</label>
+                    <select
+                      value={form.secteur_activite}
+                      onChange={e => set('secteur_activite', e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Sélectionner...</option>
+                      {secteurs.map(s => (
+                        <option key={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className={labelClass}>Adresse du siège social *</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        value={form.adresse_entreprise}
+                        onChange={e => set('adresse_entreprise', e.target.value)}
+                        required
+                        placeholder="Rue, quartier, BP..."
+                        className={`${inputClass} pl-9`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Ville *</label>
+                    <input
+                      value={form.ville}
+                      onChange={e => set('ville', e.target.value)}
+                      required
+                      placeholder="Libreville"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Pays *</label>
+                    <input
+                      value={form.pays}
+                      onChange={e => set('pays', e.target.value)}
+                      required
+                      placeholder="Gabon"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Téléphone entreprise *</label>
+                    <input
+                      value={form.telephone_entreprise}
+                      onChange={e => set('telephone_entreprise', e.target.value)}
+                      required
+                      placeholder="+241 XX XX XX XX"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Email professionnel *</label>
+                    <input
+                      type="email"
+                      value={form.email_entreprise}
+                      onChange={e => set('email_entreprise', e.target.value)}
+                      required
+                      placeholder="contact@entreprise.com"
+                      className={inputClass}
+                   />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Site Web</label>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        value={form.site_web}
+                        onChange={e => set('site_web', e.target.value)}
+                        placeholder="https://..."
+                        className={`${inputClass} pl-9`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>N° RCCM</label>
+                    <input
+                      value={form.rccm}
+                      onChange={e => set('rccm', e.target.value)}
+                      placeholder="RG LBV 2024BXXXXX"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>N° Statistique (NIF)</label>
+                    <input
+                      value={form.num_statistique}
+                      onChange={e => set('num_statistique', e.target.value)}
+                      placeholder="XXXXXXX"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>N° Impôt</label>
+                    <input
+                      va
+                      onChange={e => set('num_impot', e.target.value)}
+                      placeholder="N° contribuable..."
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Capital social (FCFA)</label>
+                    <input
+                      value={form.capital}
+                      onChange={e => set('capital', e.target.value)}
+                      placeholder="1 000 000 FCFA"
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontWeight: 600,
-                color: SING_COLORS.neutral.gray[700]
-              }}>
-                Plan <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <select
-                value={formData.plan}
-                onChange={(e) => setFormData({ ...formData, plan: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  outline: 'none',
-                  cursor: 'pointer'
-                }}
-                onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              >
-                <option value="STARTER">Starter - 25 000 FCFA/mois</option>
-                <option value="BUSINESS">Business - 50 000 FCFA/mois</option>
-                <option value="ENTERPRISE">Enterprise - Sur mesure</option>
-              </select>
-              <small style={{ color: SING_COLORS.neutral.gray[500], fontSize: '12px' }}>
-                14 jours d'essai gratuit, sans carte bancaire
-              </small>
-            </div>
+            {/* STEP 3 — Plan */}
+            {step === 3 && (
+              <div className="space-y-4">
+                {plans.map(plan => (
+                  <label
+                    key={plan.id}
+                    className={`flex items-start gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                      selectedPlan === plan.id
+                        ? 'border-[#00758D] bg-[#00758D]/5'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="plan"
+                      value={plan.id}
+                      checked={selectedPlan === plan.id}
+                      onChange={() => {
+                        setSelectedPlan(plan.id);
+                        set('plan', plan.id);
+                      }}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-[#00303C]">{plan.name}</span>
+                        {plan.recommended && (
+                          <span className="text-xs bg-[#00758D] text-white px-2 py-0.5 rounded-full">
+                            Recommandé
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[#DFC32F] font-semibold text-sm mb-2">{plan.price}</p>
+                      <ul className="space-y-1">
+                        {plan.features.map(f => (
+                          <li key={f} className="text-xs text-gray-500 flex items-center gap-1.5">
+                            <CheckCircle className="w-3 h-3 text-[#00758D]" /> {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </label>
+                ))}
 
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                style={{
-                  flex: 1,
-                  padding: '14px',
-                  background: 'transparent',
-                  color: SING_COLORS.neutral.gray[600],
-                  border: '2px solid #e5e7eb',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                ← Retour
-              </button>
+                <div className="bg-[#EDEDED] rounded-xl p-4 text-xs text-gray-500">
+                  <p>
+                    Vous pouvez changer de plan à tout moment depuis votre espace. Les plans payants bénéficient de 14
+                    jours d'essai gratuit sans engagement.
+                  </p>
+                </div>
 
+                <div className="flex items-start gap-2">
+                  <input type="checkbox" id="cgu" required className="mt-0.5" />
+                  <label htmlFor="cgu" className="text-xs text-gray-500">
+                    J'accepte les{' '}
+                    <a href="#" className="text-[#00758D] underline">
+                      Conditions Générales d'Utilisation
+                    </a>{' '}
+                    et la{' '}
+                    <a href="#" className="text-[#00758D] underline">
+                      Politique de Confidentialité
+                    </a>{' '}
+                    de SING-Facturation.
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation */}
+            <div className="flex gap-3 pt-4">
+              {step > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setStep(s => s - 1)}
+                  className="flex-1 border-2 border-gray-200 text-gray-600 py-3 rounded-2xl font-semibold text-sm hover:border-gray-300 transition-colors cursor-pointer"
+                >
+                  ← Retour
+                </button>
+              )}
               <button
                 type="submit"
-                disabled={loading}
-                style={{
-                  flex: 2,
-                  padding: '14px',
-                  background: loading ? SING_COLORS.neutral.gray[400] : SING_COLORS.primary.main,
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: SING_THEME.borderRadius.md,
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  cursor: loading ? 'not-allowed' : 'pointer'
-                }}
+                className="flex-1 bg-[#00758D] text-white py-3 rounded-2xl font-bold text-sm hover:bg-[#00303C] transition-colors cursor-pointer"
               >
-                {loading ? 'Création...' : 'Créer mon compte'}
+                {step < 3 ? 'Continuer →' : 'Créer mon compte →'}
               </button>
             </div>
           </form>
-        )}
 
-        {/* Lien connexion */}
-        <div style={{ marginTop: '24px', textAlign: 'center' }}>
-          <p style={{ color: SING_COLORS.neutral.gray[600], fontSize: '14px' }}>
+          <p className="text-center text-sm text-gray-500 mt-6">
             Vous avez déjà un compte ?{' '}
-            <Link
-              to="/login"
-              style={{
-                color: SING_COLORS.primary.main,
-                fontWeight: 600,
-                textDecoration: 'none'
-              }}
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="text-[#00758D] font-semibold hover:text-[#00303C] cursor-pointer"
             >
               Se connecter
-            </Link>
+            </button>
           </p>
-        </div>
-
-        {/* Retour landing */}
-        <div style={{ marginTop: '16px', textAlign: 'center' }}>
-          <Link
-            to="/"
-            style={{
-              color: SING_COLORS.neutral.gray[500],
-              fontSize: '14px',
-              textDecoration: 'none'
-            }}
-          >
-            ← Retour à l'accueil
-          </Link>
         </div>
       </div>
     </div>

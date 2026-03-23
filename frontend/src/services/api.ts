@@ -280,6 +280,155 @@ class ApiService {
       method: 'POST',
     });
   }
+
+  // Templates PDF
+  async uploadTemplate(file: File, nom: string, type: string) {
+    const formData = new FormData();
+    formData.append('template', file);
+    formData.append('nom', nom);
+    formData.append('type', type);
+
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(`${API_URL}/templates/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Erreur réseau' }));
+      throw new Error(error.error || 'Erreur serveur');
+    }
+
+    return response.json();
+  }
+
+  async updateTemplate(id: number, data: any) {
+    return this.request(`/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getTemplates(params?: { type?: string }) {
+    const query = new URLSearchParams();
+    if (params?.type) query.append('type', params.type);
+    
+    const queryString = query.toString();
+    return this.request(`/templates${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getTemplate(id: number) {
+    return this.request(`/templates/${id}`);
+  }
+
+  async setDefaultTemplate(id: number) {
+    return this.request(`/templates/${id}/default`, {
+      method: 'PUT',
+    });
+  }
+
+  async deleteTemplate(id: number) {
+    return this.request(`/templates/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Génération PDF
+  async generateDevisPdf(id: number, templateId?: number) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(`${API_URL}/pdf/devis/${id}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ templateId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Erreur réseau' }));
+      throw new Error(error.error || 'Erreur serveur');
+    }
+
+    // Télécharge le fichier PDF
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `devis-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  async generateFacturePdf(id: number, templateId?: number) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(`${API_URL}/pdf/facture/${id}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ templateId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Erreur réseau' }));
+      throw new Error(error.error || 'Erreur serveur');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `facture-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  async generateCommandePdf(id: number, templateId?: number) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(`${API_URL}/pdf/commande/${id}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ templateId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Erreur réseau' }));
+      throw new Error(error.error || 'Erreur serveur');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `commande-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
 }
 
 export const api = new ApiService();

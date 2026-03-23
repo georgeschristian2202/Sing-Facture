@@ -9,6 +9,8 @@ import parametresRoutes from './routes/parametres.js';
 import recapitulatifRoutes from './routes/recapitulatif.js';
 import packsRoutes from './routes/packs.js';
 import devisRoutes from './routes/devis.js';
+import templatesRoutes from './routes/templates.js';
+import pdfRoutes from './routes/pdf.js';
 
 dotenv.config();
 
@@ -32,6 +34,8 @@ app.use('/api/parametres', parametresRoutes);
 app.use('/api/recapitulatif', recapitulatifRoutes);
 app.use('/api/packs', packsRoutes);
 app.use('/api/devis', devisRoutes);
+app.use('/api/templates', templatesRoutes);
+app.use('/api/pdf', pdfRoutes);
 
 // Route de test
 app.get('/api/health', (req, res) => {

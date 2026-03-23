@@ -11,31 +11,38 @@ datasource db {
 }
 
 model Organisation {
-  id              Int      @id @default(autoincrement())
-  nom             String
-  email           String   @unique
-  telephone       String?
-  adresse         String?
-  rccm            String?
-  capital         String?
-  logo            String?
-  actif           Boolean  @default(true)
-  dateExpiration  DateTime? @map("date_expiration")
-  plan            Plan     @default(STARTER)
-  createdAt       DateTime @default(now()) @map("created_at")
-  users           User[]
-  clients         Client[]
-  produits        Produit[]
-  documents       Document[]
-  parametres      Parametres?
+  id                  Int      @id @default(autoincrement())
+  nom                 String
+  email               String   @unique
+  telephone           String?
+  adresse             String?
+  ville               String?
+  pays                String   @default("Gabon")
+  rccm                String?
+  numStatistique      String?  @map("num_statistique")
+  numImpot            String?  @map("num_impot")
+  capital             String?
+  formeJuridique      String?  @map("forme_juridique")
+  secteurActivite     String?  @map("secteur_activite")
+  siteWeb             String?  @map("site_web")
+  logo                String?
+  actif               Boolean  @default(true)
+  dateExpiration      DateTime? @map("date_expiration")
+  plan                Plan     @default(STARTER)
+  createdAt           DateTime @default(now()) @map("created_at")
+  users               User[]
+  clients             Client[]
+  produits            Produit[]
+  documents           Document[]
+  parametres          Parametres?
 
   @@map("organisations")
 }
 
 enum Plan {
   STARTER
-  BUSINESS
-  ENTERPRISE
+  PRO
+  ENTREPRISE
 
   @@map("plan")
 }
@@ -45,7 +52,8 @@ model User {
   email          String        @unique
   password       String
   nom            String
-  role           Role          @default(USER)
+  telephone      String?
+  role           Role          @default(ADMIN)
   organisationId Int           @map("organisation_id")
   organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   createdAt      DateTime      @default(now()) @map("created_at")
@@ -195,6 +203,35 @@ model Parametres {
   ribAfg         String       @default("") @map("rib_afg")
 
   @@map("parametres")
+}
+
+// Templates PDF pour génération de documents
+model PdfTemplate {
+  id              Int          @id @default(autoincrement())
+  organisationId  Int          @map("organisation_id")
+  nom             String       // Nom du template (ex: "Facture Standard", "Devis Moderne")
+  type            TypeDocument // Type de document (DEVIS, FACTURE, etc.)
+  fichierOriginal String       @map("fichier_original") // Chemin du PDF uploadé
+  
+  // Styles extraits automatiquement
+  couleurPrimaire String?      @map("couleur_primaire") // Couleur dominante (hex)
+  couleurSecondaire String?    @map("couleur_secondaire")
+  couleurTexte    String?      @map("couleur_texte")
+  police          String?      // Police principale détectée
+  
+  // Configuration de mise en page
+  marges          Json?        // {top: 50, right: 50, bottom: 50, left: 50}
+  sections        Json?        // Configuration des sections du document
+  
+  actif           Boolean      @default(true)
+  parDefaut       Boolean      @default(false) @map("par_defaut") // Template par défaut pour ce type
+  
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  @@index([organisationId])
+  @@index([type])
+  @@map("pdf_templates")
 }
 
 // Système de PACKS (codes produits avec sous-services)
