@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, CheckCircle, Building2, User, Mail, Phone, MapPin, Globe, CreditCard } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, Building2, User, Mail, Phone, MapPin, Globe, CreditCard, AlertCircle } from 'lucide-react';
 import SingLogo from '../components/SingLogo';
 
 const steps = [
@@ -42,6 +42,8 @@ export default function Register() {
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('starter');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
     // Compte
     nom_complet: '',
@@ -99,14 +101,40 @@ export default function Register() {
     'Autre'
   ];
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError('');
+    
     if (step < 3) {
       setStep(s => s + 1);
     } else {
-      // TODO: Appel API pour créer le compte
-      console.log('Form data:', form);
-      navigate('/login');
+      // Étape 3 : Créer le compte
+      setLoading(true);
+      
+      try {
+        // Importer le service API
+        const { api } = await import('../services/api');
+        
+        // Mapper les données du formulaire vers le format attendu par le backend
+        await api.register({
+          nom: form.nom_complet,
+          email: form.email,
+          password: form.password,
+          companyName: form.nom_entreprise,
+          companyEmail: form.email_entreprise,
+          telephone: form.telephone_entreprise,
+          adresse: form.adresse_entreprise,
+          rccm: form.rccm,
+          capital: form.capital,
+          plan: form.plan.toUpperCase()
+        });
+        
+        // Rediriger vers le dashboard après inscription réussie
+        navigate('/dashboard');
+      } catch (err: any) {
+        setError(err.message || 'Erreur lors de l\'inscription');
+        setLoading(false);
+      }
     }
   }
 
@@ -202,6 +230,13 @@ export default function Register() {
             {step === 2 && 'Ces informations apparaîtront sur vos documents commerciaux'}
             {step === 3 && 'Commencez gratuitement, évoluez selon vos besoins'}
           </p>
+
+          {/* Message d'erreur */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* STEP 1 — Compte */}
@@ -530,9 +565,20 @@ export default function Register() {
               )}
               <button
                 type="submit"
-                className="flex-1 bg-[#00758D] text-white py-3 rounded-2xl font-bold text-sm hover:bg-[#00303C] transition-colors cursor-pointer"
+                disabled={loading}
+                className="flex-1 bg-[#00758D] text-white py-3 rounded-2xl font-bold text-sm hover:bg-[#00303C] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {step < 3 ? 'Continuer →' : 'Créer mon compte →'}
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Création en cours...
+                  </>
+                ) : (
+                  step < 3 ? 'Continuer →' : 'Créer mon compte →'
+                )}
               </button>
             </div>
           </form>

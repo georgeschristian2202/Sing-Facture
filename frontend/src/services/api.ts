@@ -196,6 +196,31 @@ class ApiService {
     });
   }
 
+  // Méthodes génériques pour compatibilité
+  async get(endpoint: string) {
+    return this.request(endpoint);
+  }
+
+  async put(endpoint: string, data: any) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async post(endpoint: string, data: any) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async delete(endpoint: string) {
+    return this.request(endpoint, {
+      method: 'DELETE',
+    });
+  }
+
   // Packs
   async getPacks(params?: { actif?: boolean; sousService?: string }) {
     const query = new URLSearchParams();

@@ -1,537 +1,403 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { SING_COLORS, SING_THEME } from '../config/colors';
+import { SING_COLORS } from '../config/colors';
+import { Plus, Search, Edit, Trash2, Package, X } from 'lucide-react';
 
-interface Pack {
+interface Produit {
   id: number;
   code: string;
-  descCourte: string;
-  prixUnitaire: number;
-  sousService: string;
+  description: string;
+  descriptionCourte?: string;
+  prixUnitaireHT: number;
+  categorie: string;
   actif: boolean;
-  details: PackDetail[];
 }
 
-interface PackDetail {
-  id: number;
-  ordre: number;
-  descriptionLongue: string;
-}
+const CATEGORIES = [
+  'Programme',
+  'SING logiciels',
+  'SING conseil',
+  'Incubateur'
+];
 
 export default function ProduitsModule() {
-  const [packs, setPacks] = useState<Pack[]>([]);
+  const [produits, setProduits] = useState<Produit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [editingPack, setEditingPack] = useState<Pack | null>(null);
+  const [editingProduit, setEditingProduit] = useState<Produit | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterSousService, setFilterSousService] = useState('');
-  const [sousServices, setSousServices] = useState<string[]>([]);
+  const [selectedCategorie, setSelectedCategorie] = useState<string>('');
   const [formData, setFormData] = useState({
     code: '',
-    descCourte: '',
-    prixUnitaire: '',
-    sousService: '',
-    actif: true,
-    details: ['']
+    description: '',
+    descriptionCourte: '',
+    prixUnitaireHT: '',
+    categorie: 'Programme',
+    actif: true
   });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadPacks();
-    loadSousServices();
+    loadProduits();
   }, []);
 
-  const loadPacks = async () => {
+  useEffect(() => {
+    if (editingProduit) {
+      setFormData({
+        code: editingProduit.code || '',
+        description: editingProduit.description || '',
+        descriptionCourte: editingProduit.descriptionCourte || '',
+        prixUnitaireHT: editingProduit.prixUnitaireHT.toString(),
+        categorie: editingProduit.categorie || 'Programme',
+        actif: editingProduit.actif !== false
+      });
+    } else {
+      setFormData({
+        code: '',
+        description: '',
+        descriptionCourte: '',
+        prixUnitaireHT: '',
+        categorie: 'Programme',
+        actif: true
+      });
+    }
+  }, [editingProduit, showModal]);
+
+  const loadProduits = async () => {
     try {
-      const data = await api.getPacks({ actif: true });
-      setPacks(data);
+      const data = await api.getProduits();
+      setProduits(data);
     } catch (error) {
-      console.error('Erreur chargement packs:', error);
+      console.error('Erreur chargement produits:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadSousServices = async () => {
+  const handleDelete = async (id: number) => {
+    if (!confirm('Supprimer cette prestation ?')) return;
     try {
-      const data = await api.getSousServices();
-      setSousServices(data);
+      await api.deleteProduit(id);
+      setProduits(produits.filter(p => p.id !== id));
     } catch (error) {
-      console.error('Erreur chargement sous-services:', error);
+      console.error('Erreur suppression:', error);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
+    if (!formData.code.trim() || !formData.description.trim() || !formData.prixUnitaireHT) {
+      alert('Code, description et prix sont requis');
+      return;
+    }
+
+    setSaving(true);
     try {
-      const packData = {
+      const data = {
         ...formData,
-        prixUnitaire: parseFloat(formData.prixUnitaire),
-        details: formData.details.filter(d => d.trim() !== '')
+        prixUnitaireHT: parseFloat(formData.prixUnitaireHT)
       };
 
-      if (editingPack) {
-        await api.updatePack(editingPack.id, packData);
+      if (editingProduit) {
+        const updated = await api.updateProduit(editingProduit.id, data);
+        setProduits(produits.map(p => p.id === editingProduit.id ? updated : p));
       } else {
-        await api.createPack(packData);
+        const created = await api.createProduit(data);
+        setProduits([created, ...produits]);
       }
       setShowModal(false);
-      setEditingPack(null);
-      resetForm();
-      loadPacks();
-      loadSousServices();
-    } catch (error: any) {
-      alert(error.message || 'Erreur lors de l\'enregistrement');
+      setEditingProduit(null);
+    } catch (error) {
+      console.error('Erreur sauvegarde:', error);
+      alert('Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      code: '',
-      descCourte: '',
-      prixUnitaire: '',
-      sousService: '',
-      actif: true,
-      details: ['']
-    });
+  const filteredProduits = produits.filter(p => {
+    const matchSearch = p.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       p.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchCategorie = !selectedCategorie || p.categorie === selectedCategorie;
+    return matchSearch && matchCategorie;
+  });
+
+  const groupedProduits = CATEGORIES.reduce((acc, cat) => {
+    acc[cat] = filteredProduits.filter(p => p.categorie === cat);
+    return acc;
+  }, {} as Record<string, Produit[]>);
+
+  const formatPrice = (price: number) => {
+    return `${price.toLocaleString('fr-FR')} FCFA`;
   };
-
-  const handleEdit = (pack: Pack) => {
-    setEditingPack(pack);
-    setFormData({
-      code: pack.code,
-      descCourte: pack.descCourte,
-      prixUnitaire: pack.prixUnitaire.toString(),
-      sousService: pack.sousService,
-      actif: pack.actif,
-      details: pack.details.length > 0 ? pack.details.map(d => d.descriptionLongue) : ['']
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce pack ?')) return;
-    
-    try {
-      await api.deletePack(id);
-      loadPacks();
-    } catch (error: any) {
-      alert(error.message || 'Erreur lors de la suppression');
-    }
-  };
-
-  const addDetail = () => {
-    setFormData({ ...formData, details: [...formData.details, ''] });
-  };
-
-  const removeDetail = (index: number) => {
-    const newDetails = formData.details.filter((_, i) => i !== index);
-    setFormData({ ...formData, details: newDetails.length > 0 ? newDetails : [''] });
-  };
-
-  const updateDetail = (index: number, value: string) => {
-    const newDetails = [...formData.details];
-    newDetails[index] = value;
-    setFormData({ ...formData, details: newDetails });
-  };
-
-  const filteredPacks = packs.filter(p => 
-    (p.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     p.descCourte.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (filterSousService === '' || p.sousService === filterSousService)
-  );
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
-  };
-
-  if (loading) {
-    return <div>Chargement...</div>;
-  }
 
   return (
     <div>
-      {/* Header avec filtres */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <input
-          type="text"
-          placeholder="Rechercher un pack..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            flex: 1,
-            minWidth: '250px',
-            padding: '12px',
-            border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-            borderRadius: SING_THEME.borderRadius.md,
-            fontSize: '14px',
-            outline: 'none'
-          }}
-        />
-        
-        <select
-          value={filterSousService}
-          onChange={(e) => setFilterSousService(e.target.value)}
-          style={{
-            padding: '12px',
-            border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-            borderRadius: SING_THEME.borderRadius.md,
-            fontSize: '14px',
-            outline: 'none',
-            cursor: 'pointer'
-          }}
-        >
-          <option value="">Tous les sous-services</option>
-          {sousServices.map((ss, i) => (
-            <option key={i} value={ss}>{ss}</option>
-          ))}
-        </select>
-
+      {/* Header */}
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: SING_COLORS.primary.dark, margin: '0 0 4px 0' }}>
+            Catalogue des Prestations
+          </h1>
+          <p style={{ color: SING_COLORS.neutral.gray[600], margin: 0, fontSize: '14px' }}>
+            {produits.length} prestation(s) enregistrée(s)
+          </p>
+        </div>
         <button
           onClick={() => {
-            setEditingPack(null);
-            resetForm();
+            setEditingProduit(null);
             setShowModal(true);
           }}
           style={{
-            padding: '12px 24px',
-            background: SING_COLORS.primary.main,
-            color: '#fff',
-            border: 'none',
-            borderRadius: SING_THEME.borderRadius.md,
-            fontWeight: 600,
-            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            whiteSpace: 'nowrap'
+            padding: '12px 20px',
+            backgroundColor: SING_COLORS.primary.main,
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
           }}
         >
-          <span style={{ fontSize: '18px' }}>+</span>
-          Nouveau Pack
+          <Plus size={18} />
+          Nouvelle prestation
         </button>
       </div>
 
-      {/* Grille des packs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
-        {filteredPacks.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: SING_COLORS.neutral.gray[500] }}>
-            {searchTerm || filterSousService ? 'Aucun pack trouvé' : 'Aucun pack enregistré'}
-          </div>
-        ) : (
-          filteredPacks.map((pack) => (
-            <div key={pack.id} style={{
-              background: '#fff',
-              borderRadius: SING_THEME.borderRadius.lg,
-              padding: '20px',
-              boxShadow: SING_THEME.shadows.md,
-              border: `2px solid ${SING_COLORS.secondary.main}`,
-              transition: 'all 0.2s'
-            }}>
-              {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-                <div style={{
-                  background: SING_COLORS.secondary.main,
-                  color: SING_COLORS.neutral.gray[900],
-                  padding: '4px 12px',
-                  borderRadius: SING_THEME.borderRadius.sm,
-                  fontWeight: 'bold',
-                  fontSize: '14px'
-                }}>
-                  {pack.code}
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => handleEdit(pack)}
-                    style={{
-                      padding: '4px 8px',
-                      background: SING_COLORS.accent.main,
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: SING_THEME.borderRadius.sm,
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => handleDelete(pack.id)}
-                    style={{
-                      padding: '4px 8px',
-                      background: SING_COLORS.status.error,
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: SING_THEME.borderRadius.sm,
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-
-              {/* Description */}
-              <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px', color: SING_COLORS.neutral.gray[900] }}>
-                {pack.descCourte}
-              </h3>
-
-              {/* Prix */}
-              <div style={{ fontSize: '20px', fontWeight: 'bold', color: SING_COLORS.primary.main, marginBottom: '12px' }}>
-                {formatCurrency(pack.prixUnitaire)}
-              </div>
-
-              {/* Sous-service */}
-              <div style={{
-                fontSize: '12px',
-                color: SING_COLORS.neutral.gray[600],
-                marginBottom: '12px',
-                padding: '4px 8px',
-                background: SING_COLORS.neutral.gray[100],
-                borderRadius: SING_THEME.borderRadius.sm,
-                display: 'inline-block'
-              }}>
-                {pack.sousService}
-              </div>
-
-              {/* Détails */}
-              {pack.details.length > 0 && (
-                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${SING_COLORS.neutral.gray[200]}` }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: SING_COLORS.neutral.gray[700], marginBottom: '8px' }}>
-                    Détails :
-                  </div>
-                  <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: SING_COLORS.neutral.gray[600] }}>
-                    {pack.details.slice(0, 3).map((detail) => (
-                      <li key={detail.id} style={{ marginBottom: '4px' }}>
-                        {detail.descriptionLongue}
-                      </li>
-                    ))}
-                    {pack.details.length > 3 && (
-                      <li style={{ color: SING_COLORS.primary.main, fontStyle: 'italic' }}>
-                        +{pack.details.length - 3} autre(s)...
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ))
-        )}
+      {/* Search */}
+      <div style={{ marginBottom: '24px', position: 'relative' }}>
+        <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: SING_COLORS.neutral.gray[400] }} />
+        <input
+          type="text"
+          placeholder="Rechercher une prestation..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '12px 16px 12px 48px',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            fontSize: '14px',
+            outline: 'none',
+            backgroundColor: 'white'
+          }}
+        />
       </div>
 
-      {/* Modal Création/Édition */}
-      {showModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }}
-        onClick={() => setShowModal(false)}>
-          <div style={{
-            background: '#fff',
-            borderRadius: SING_THEME.borderRadius.lg,
-            padding: '32px',
-            maxWidth: '600px',
-            width: '100%',
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }}
-          onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px', color: SING_COLORS.primary.main }}>
-              {editingPack ? 'Modifier le pack' : 'Nouveau pack'}
-            </h2>
+      {/* Prestations by Category */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+          <div style={{ width: '48px', height: '48px', border: `4px solid ${SING_COLORS.primary.main}`, borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          {CATEGORIES.map(categorie => {
+            const items = groupedProduits[categorie];
+            if (items.length === 0) return null;
 
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                    Code <span style={{ color: SING_COLORS.status.error }}>*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    placeholder="Ex: S1"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                      borderRadius: SING_THEME.borderRadius.md,
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                  />
+            return (
+              <div key={categorie}>
+                {/* Category Header */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '16px',
+                  paddingBottom: '8px',
+                  borderBottom: '2px solid #e5e7eb'
+                }}>
+                  <h2 style={{ fontSize: '18px', fontWeight: '600', color: SING_COLORS.primary.dark, margin: 0 }}>
+                    {categorie}
+                  </h2>
+                  <span style={{
+                    padding: '4px 12px',
+                    backgroundColor: `${SING_COLORS.primary.main}15`,
+                    color: SING_COLORS.primary.main,
+                    borderRadius: '12px',
+                    fontSize: '13px',
+                    fontWeight: '600'
+                  }}>
+                    {items.length}
+                  </span>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                    Prix Unitaire (FCFA) <span style={{ color: SING_COLORS.status.error }}>*</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.prixUnitaire}
-                    onChange={(e) => setFormData({ ...formData, prixUnitaire: e.target.value })}
-                    placeholder="Ex: 1187500"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                      borderRadius: SING_THEME.borderRadius.md,
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                  Description Courte <span style={{ color: SING_COLORS.status.error }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.descCourte}
-                  onChange={(e) => setFormData({ ...formData, descCourte: e.target.value })}
-                  placeholder="Ex: Assistance informatique - SING Réseau"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                    borderRadius: SING_THEME.borderRadius.md,
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                  Sous-Service <span style={{ color: SING_COLORS.status.error }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.sousService}
-                  onChange={(e) => setFormData({ ...formData, sousService: e.target.value })}
-                  placeholder="Ex: Assistance informatique"
-                  list="sous-services-list"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                    borderRadius: SING_THEME.borderRadius.md,
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
-                <datalist id="sous-services-list">
-                  {sousServices.map((ss, i) => (
-                    <option key={i} value={ss} />
-                  ))}
-                </datalist>
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                  Détails (Descriptions longues)
-                </label>
-                {formData.details.map((detail, index) => (
-                  <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    <input
-                      type="text"
-                      value={detail}
-                      onChange={(e) => updateDetail(index, e.target.value)}
-                      placeholder={`Détail ${index + 1}`}
+                {/* Products Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                  {items.map((produit) => (
+                    <div
+                      key={produit.id}
                       style={{
-                        flex: 1,
-                        padding: '10px',
-                        border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                        borderRadius: SING_THEME.borderRadius.md,
-                        fontSize: '14px',
-                        outline: 'none'
+                        backgroundColor: 'white',
+                        padding: '20px',
+                        borderRadius: '12px',
+                        border: '1px solid #e5e7eb',
+                        transition: 'all 0.2s',
+                        cursor: 'pointer'
                       }}
-                    />
-                    {formData.details.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeDetail(index)}
-                        style={{
-                          padding: '10px',
-                          background: SING_COLORS.status.error,
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: SING_THEME.borderRadius.md,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        🗑️
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addDetail}
-                  style={{
-                    padding: '8px 16px',
-                    background: SING_COLORS.secondary.main,
-                    color: SING_COLORS.neutral.gray[900],
-                    border: 'none',
-                    borderRadius: SING_THEME.borderRadius.md,
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  + Ajouter un détail
-                </button>
-              </div>
+                    >
+                      {/* Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                        <div style={{
+                          padding: '6px 12px',
+                          backgroundColor: `${SING_COLORS.secondary.main}`,
+                          color: SING_COLORS.primary.dark,
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          fontWeight: 'bold'
+                        }}>
+                          {produit.code}
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            onClick={() => {
+                              setEditingProduit(produit);
+                              setShowModal(true);
+                            }}
+                            style={{
+                              padding: '6px',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              color: SING_COLORS.neutral.gray[400],
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(produit.id)}
+                            style={{
+                              padding: '6px',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              color: SING_COLORS.neutral.gray[400],
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    background: 'transparent',
-                    color: SING_COLORS.neutral.gray[600],
-                    border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                    borderRadius: SING_THEME.borderRadius.md,
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    background: SING_COLORS.primary.main,
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: SING_THEME.borderRadius.md,
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {editingPack ? 'Mettre à jour' : 'Créer'}
-                </button>
+                      {/* Description */}
+                      <h3 style={{
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        color: SING_COLORS.primary.dark,
+                        margin: '0 0 6px 0',
+                        lineHeight: '1.4'
+                      }}>
+                        {produit.description}
+                      </h3>
+
+                      {produit.descriptionCourte && (
+                        <p style={{
+                          fontSize: '13px',
+                          color: SING_COLORS.neutral.gray[600],
+                          margin: '0 0 12px 0',
+                          lineHeight: '1.4'
+                        }}>
+                          {produit.descriptionCourte}
+                        </p>
+                      )}
+
+                      {/* Price */}
+                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f3f4f6' }}>
+                        <p style={{ fontSize: '18px', fontWeight: 'bold', color: SING_COLORS.primary.main, margin: 0 }}>
+                          {formatPrice(produit.prixUnitaireHT)}
+                        </p>
+                        <p style={{ fontSize: '12px', color: SING_COLORS.neutral.gray[500], margin: '2px 0 0 0' }}>
+                          Prix unitaire HT
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </form>
+            );
+          })}
+
+          {filteredProduits.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: SING_COLORS.neutral.gray[400] }}>
+              Aucune prestation trouvée
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal */}
+      {showModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px', backdropFilter: 'blur(4px)' }} onClick={() => setShowModal(false)}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', maxWidth: '600px', width: '100%', maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ padding: '24px 28px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: SING_COLORS.primary.dark, margin: 0 }}>
+                  {editingProduit ? 'Modifier la prestation' : 'Nouvelle prestation'}
+                </h2>
+                <p style={{ fontSize: '13px', color: SING_COLORS.neutral.gray[500], margin: '4px 0 0 0' }}>
+                  Remplissez les informations de la prestation
+                </p>
+              </div>
+              <button onClick={() => setShowModal(false)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', backgroundColor: '#f3f4f6', color: SING_COLORS.neutral.gray[600], cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '28px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700], marginBottom: '6px' }}>
+                      Code <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', transition: 'all 0.2s' }} placeholder="Ex: S1" />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700], marginBottom: '6px' }}>
+                      Catégorie <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <select value={formData.categorie} onChange={(e) => setFormData({ ...formData, categorie: e.target.value })} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', transition: 'all 0.2s', backgroundColor: 'white', cursor: 'pointer' }}>
+                      {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700], marginBottom: '6px' }}>
+                    Description <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <input type="text" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', transition: 'all 0.2s' }} placeholder="Description complète" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700], marginBottom: '6px' }}>
+                    Description courte (PDF)
+                  </label>
+                  <input type="text" value={formData.descriptionCourte} onChange={(e) => setFormData({ ...formData, descriptionCourte: e.target.value })} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', transition: 'all 0.2s' }} placeholder="Description courte pour PDF" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700], marginBottom: '6px' }}>
+                    Prix unitaire HT (FCFA) <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <input type="number" value={formData.prixUnitaireHT} onChange={(e) => setFormData({ ...formData, prixUnitaireHT: e.target.value })} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', transition: 'all 0.2s' }} placeholder="0" />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '20px 28px', borderTop: '1px solid #f3f4f6', display: 'flex', gap: '12px', justifyContent: 'flex-end', backgroundColor: '#fafbfc' }}>
+              <button onClick={() => setShowModal(false)} style={{ padding: '12px 24px', backgroundColor: 'white', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', color: SING_COLORS.neutral.gray[700], transition: 'all 0.2s' }}>Annuler</button>
+              <button onClick={handleSave} disabled={saving || !formData.code.trim() || !formData.description.trim() || !formData.prixUnitaireHT} style={{ padding: '12px 32px', backgroundColor: saving || !formData.code.trim() || !formData.description.trim() || !formData.prixUnitaireHT ? SING_COLORS.neutral.gray[400] : SING_COLORS.primary.main, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: saving || !formData.code.trim() || !formData.description.trim() || !formData.prixUnitaireHT ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,117,141,0.3)' }}>
+                {saving ? 'Enregistrement...' : editingProduit ? 'Mettre à jour' : 'Créer la prestation'}
+              </button>
+            </div>
           </div>
         </div>
       )}

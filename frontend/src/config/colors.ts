@@ -74,6 +74,24 @@ export const SING_COLORS = {
     info: '#3b82f6'       // Bleu
   },
 
+  // Couleurs de fond
+  background: {
+    main: '#F5F5F5',      // Fond principal
+    secondary: '#FFFFFF', // Fond secondaire (cartes)
+    dark: '#0C303C'       // Fond sombre
+  },
+
+  // Couleurs de texte
+  text: {
+    primary: '#1D1D1B',   // Texte principal
+    secondary: '#5C5C5C', // Texte secondaire
+    light: '#A8A8A8',     // Texte clair
+    white: '#FFFFFF'      // Texte blanc
+  },
+
+  // Couleurs de bordure
+  border: '#E5E7EB',
+
   // Gradients SING
   gradients: {
     primary: 'linear-gradient(135deg, #8E0B56 0%, #B8155E 100%)',

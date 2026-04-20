@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { SING_COLORS, SING_THEME } from '../config/colors';
+import { SING_COLORS } from '../config/colors';
+import { Plus, Search, Edit, Trash2, User, Phone, Mail, MapPin, X } from 'lucide-react';
 
 interface Representant {
   id?: number;
@@ -19,8 +20,13 @@ interface Client {
   email?: string;
   pays: string;
   representants?: Representant[];
-  _count?: { documents: number };
 }
+
+const PAYS_LIST = [
+  'Gabon', 'Cameroun', 'Congo', 'RDC', 'Guinée Équatoriale', 'Tchad', 'Centrafrique',
+  'France', 'Belgique', 'Suisse', 'Canada', "Côte d'Ivoire", 'Sénégal', 'Mali',
+  'Burkina Faso', 'Niger', 'Bénin', 'Togo', 'Autre'
+];
 
 export default function ClientsModule() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -36,10 +42,35 @@ export default function ClientsModule() {
     pays: 'Gabon',
     representants: [{ nom: '', fonction: '', tel: '', email: '', principal: true }] as Representant[]
   });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadClients();
   }, []);
+
+  useEffect(() => {
+    if (editingClient) {
+      setFormData({
+        nom: editingClient.nom || '',
+        adresse: editingClient.adresse || '',
+        tel: editingClient.tel || '',
+        email: editingClient.email || '',
+        pays: editingClient.pays || 'Gabon',
+        representants: editingClient.representants && editingClient.representants.length > 0
+          ? editingClient.representants
+          : [{ nom: '', fonction: '', tel: '', email: '', principal: true }]
+      });
+    } else {
+      setFormData({
+        nom: '',
+        adresse: '',
+        tel: '',
+        email: '',
+        pays: 'Gabon',
+        representants: [{ nom: '', fonction: '', tel: '', email: '', principal: true }]
+      });
+    }
+  }, [editingClient, showModal]);
 
   const loadClients = async () => {
     try {
@@ -52,66 +83,45 @@ export default function ClientsModule() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleDelete = async (id: number) => {
+    if (!confirm('Supprimer ce client ?')) return;
     try {
-      // Filtrer les représentants vides
-      const representantsValides = formData.representants.filter(r => r.nom.trim() !== '');
-      
-      const clientData = {
-        ...formData,
-        representants: representantsValides
-      };
+      await api.deleteClient(id);
+      setClients(clients.filter(c => c.id !== id));
+    } catch (error) {
+      console.error('Erreur suppression:', error);
+    }
+  };
 
+  const handleSave = async () => {
+    if (!formData.nom.trim()) {
+      alert('Le nom du client est requis');
+      return;
+    }
+
+    setSaving(true);
+    try {
       if (editingClient) {
-        await api.updateClient(editingClient.id, clientData);
+        const updated = await api.updateClient(editingClient.id, formData);
+        setClients(clients.map(c => c.id === editingClient.id ? updated : c));
       } else {
-        await api.createClient(clientData);
+        const created = await api.createClient(formData);
+        setClients([created, ...clients]);
       }
       setShowModal(false);
       setEditingClient(null);
-      resetForm();
-      loadClients();
-    } catch (error: any) {
-      alert(error.message || 'Erreur lors de l\'enregistrement');
+    } catch (error) {
+      console.error('Erreur sauvegarde:', error);
+      alert('Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      nom: '',
-      adresse: '',
-      tel: '',
-      email: '',
-      pays: 'Gabon',
-      representants: [{ nom: '', fonction: '', tel: '', email: '', principal: true }]
-    });
-  };
-
-  const handleEdit = (client: Client) => {
-    setEditingClient(client);
-    setFormData({
-      nom: client.nom,
-      adresse: client.adresse || '',
-      tel: client.tel || '',
-      email: client.email || '',
-      pays: client.pays,
-      representants: client.representants && client.representants.length > 0
-        ? client.representants
-        : [{ nom: '', fonction: '', tel: '', email: '', principal: true }]
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce client et tous ses représentants ?')) return;
-    
-    try {
-      await api.deleteClient(id);
-      loadClients();
-    } catch (error: any) {
-      alert(error.message || 'Erreur lors de la suppression');
-    }
+  const updateRepresentant = (index: number, field: keyof Representant, value: any) => {
+    const newReps = [...formData.representants];
+    newReps[index] = { ...newReps[index], [field]: value };
+    setFormData({ ...formData, representants: newReps });
   };
 
   const addRepresentant = () => {
@@ -122,529 +132,245 @@ export default function ClientsModule() {
   };
 
   const removeRepresentant = (index: number) => {
-    const newReps = formData.representants.filter((_, i) => i !== index);
+    if (formData.representants.length === 1) return;
     setFormData({
       ...formData,
-      representants: newReps.length > 0 ? newReps : [{ nom: '', fonction: '', tel: '', email: '', principal: true }]
+      representants: formData.representants.filter((_, i) => i !== index)
     });
   };
 
-  const updateRepresentant = (index: number, field: keyof Representant, value: any) => {
-    const newReps = [...formData.representants];
-    newReps[index] = { ...newReps[index], [field]: value };
-    
-    // Si on marque un représentant comme principal, démarquer les autres
-    if (field === 'principal' && value === true) {
-      newReps.forEach((rep, i) => {
-        if (i !== index) rep.principal = false;
-      });
-    }
-    
-    setFormData({ ...formData, representants: newReps });
-  };
-
-  const filteredClients = clients.filter(c => 
-    c.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredClients = clients.filter(c =>
+    c.nom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.tel?.includes(searchTerm) ||
-    c.representants?.some(r => 
-      r.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    c.representants?.some(r => r.nom?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  if (loading) {
-    return <div>Chargement...</div>;
-  }
+  const getRepresentantPrincipal = (client: Client) => {
+    return client.representants?.find(r => r.principal);
+  };
 
   return (
     <div>
-      {/* Header avec actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div style={{ flex: 1, maxWidth: '400px' }}>
-          <input
-            type="text"
-            placeholder="Rechercher un client ou représentant..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-              borderRadius: SING_THEME.borderRadius.md,
-              fontSize: '14px',
-              outline: 'none'
-            }}
-            onFocus={(e) => e.target.style.borderColor = SING_COLORS.primary.main}
-            onBlur={(e) => e.target.style.borderColor = SING_COLORS.neutral.gray[300]}
-          />
+      {/* Header */}
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: SING_COLORS.primary.dark, margin: '0 0 4px 0' }}>
+            Clients
+          </h1>
+          <p style={{ color: SING_COLORS.neutral.gray[600], margin: 0, fontSize: '14px' }}>
+            {clients.length} client(s) enregistré(s)
+          </p>
         </div>
         <button
           onClick={() => {
             setEditingClient(null);
-            resetForm();
             setShowModal(true);
           }}
           style={{
-            padding: '12px 24px',
-            background: SING_COLORS.primary.main,
-            color: '#fff',
-            border: 'none',
-            borderRadius: SING_THEME.borderRadius.md,
-            fontWeight: 600,
-            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '8px',
+            padding: '12px 20px',
+            backgroundColor: SING_COLORS.primary.main,
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
           }}
         >
-          <span style={{ fontSize: '18px' }}>+</span>
-          Nouveau Client
+          <Plus size={18} />
+          Nouveau client
         </button>
       </div>
 
-      {/* Liste des clients */}
-      <div style={{ background: '#fff', borderRadius: SING_THEME.borderRadius.lg, overflow: 'hidden', boxShadow: SING_THEME.shadows.sm }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: SING_COLORS.neutral.gray[100], borderBottom: `2px solid ${SING_COLORS.primary.main}` }}>
-              <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>Organisation</th>
-              <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>Représentant Principal</th>
-              <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>Contact</th>
-              <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>Pays</th>
-              <th style={{ padding: '16px', textAlign: 'center', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>Documents</th>
-              <th style={{ padding: '16px', textAlign: 'center', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredClients.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: SING_COLORS.neutral.gray[500] }}>
-                  {searchTerm ? 'Aucun client trouvé' : 'Aucun client enregistré'}
-                </td>
-              </tr>
-            ) : (
-              filteredClients.map((client) => {
-                const repPrincipal = client.representants?.find(r => r.principal) || client.representants?.[0];
-                return (
-                  <tr key={client.id} style={{ borderBottom: `1px solid ${SING_COLORS.neutral.gray[200]}` }}>
-                    <td style={{ padding: '16px' }}>
-                      <div style={{ fontWeight: 600, color: SING_COLORS.neutral.gray[900], marginBottom: '4px' }}>
-                        {client.nom}
-                      </div>
-                      {client.adresse && (
-                        <div style={{ fontSize: '12px', color: SING_COLORS.neutral.gray[600] }}>
-                          📍 {client.adresse}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      {repPrincipal ? (
-                        <div>
-                          <div style={{ fontWeight: 500, color: SING_COLORS.neutral.gray[800] }}>
-                            {repPrincipal.nom}
-                          </div>
-                          {repPrincipal.fonction && (
-                            <div style={{ fontSize: '12px', color: SING_COLORS.neutral.gray[600] }}>
-                              {repPrincipal.fonction}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span style={{ color: SING_COLORS.neutral.gray[400] }}>-</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      {repPrincipal ? (
-                        <div style={{ fontSize: '13px' }}>
-                          {repPrincipal.tel && (
-                            <div style={{ color: SING_COLORS.neutral.gray[700], marginBottom: '2px' }}>
-                              📞 {repPrincipal.tel}
-                            </div>
-                          )}
-                          {repPrincipal.email && (
-                            <div style={{ color: SING_COLORS.neutral.gray[700] }}>
-                              ✉️ {repPrincipal.email}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: '13px' }}>
-                          {client.tel && <div style={{ color: SING_COLORS.neutral.gray[700] }}>📞 {client.tel}</div>}
-                          {client.email && <div style={{ color: SING_COLORS.neutral.gray[700] }}>✉️ {client.email}</div>}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '16px', color: SING_COLORS.neutral.gray[700] }}>{client.pays}</td>
-                    <td style={{ padding: '16px', textAlign: 'center', color: SING_COLORS.neutral.gray[700] }}>
-                      {client._count?.documents || 0}
-                    </td>
-                    <td style={{ padding: '16px', textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleEdit(client)}
-                        style={{
-                          padding: '6px 12px',
-                          background: SING_COLORS.accent.main,
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: SING_THEME.borderRadius.sm,
-                          cursor: 'pointer',
-                          marginRight: '8px',
-                          fontSize: '12px'
-                        }}
-                      >
-                        Modifier
-                      </button>
-                      <button
-                        onClick={() => handleDelete(client.id)}
-                        style={{
-                          padding: '6px 12px',
-                          background: SING_COLORS.status.error,
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: SING_THEME.borderRadius.sm,
-                          cursor: 'pointer',
-                          fontSize: '12px'
-                        }}
-                      >
-                        Supprimer
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+      {/* Search */}
+      <div style={{ marginBottom: '24px', position: 'relative' }}>
+        <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: SING_COLORS.neutral.gray[400] }} />
+        <input
+          type="text"
+          placeholder="Rechercher un client..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '12px 16px 12px 48px',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            fontSize: '14px',
+            outline: 'none',
+            backgroundColor: 'white'
+          }}
+        />
       </div>
 
-      {/* Modal Création/Édition */}
+      {/* Clients Grid */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+          <div style={{ width: '48px', height: '48px', border: `4px solid ${SING_COLORS.primary.main}`, borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+          {filteredClients.map((client) => {
+            const rep = getRepresentantPrincipal(client);
+            return (
+              <div key={client.id} style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e5e7eb', transition: 'all 0.2s', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: `${SING_COLORS.primary.main}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <User size={20} color={SING_COLORS.primary.main} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button onClick={() => { setEditingClient(client); setShowModal(true); }} style={{ padding: '6px', backgroundColor: 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer', color: SING_COLORS.neutral.gray[400], transition: 'all 0.2s' }}>
+                      <Edit size={16} />
+                    </button>
+                    <button onClick={() => handleDelete(client.id)} style={{ padding: '6px', backgroundColor: 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer', color: SING_COLORS.neutral.gray[400], transition: 'all 0.2s' }}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', color: SING_COLORS.primary.dark, margin: '0 0 8px 0' }}>{client.nom}</h3>
+                {rep && <p style={{ fontSize: '13px', color: SING_COLORS.primary.main, fontWeight: '500', margin: '0 0 12px 0' }}>Représentant : {rep.nom}</p>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                  {client.adresse && (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <MapPin size={14} color={SING_COLORS.neutral.gray[400]} style={{ marginTop: '2px', flexShrink: 0 }} />
+                      <span style={{ fontSize: '13px', color: SING_COLORS.neutral.gray[600], lineHeight: '1.4' }}>{client.adresse}</span>
+                    </div>
+                  )}
+                  {client.tel && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Phone size={14} color={SING_COLORS.neutral.gray[400]} style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: '13px', color: SING_COLORS.neutral.gray[600] }}>{client.tel}</span>
+                    </div>
+                  )}
+                  {client.email && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Mail size={14} color={SING_COLORS.neutral.gray[400]} style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: '13px', color: SING_COLORS.neutral.gray[600], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.email}</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: SING_COLORS.neutral.gray[400] }}>{client.pays || 'Gabon'}</span>
+                </div>
+              </div>
+            );
+          })}
+          {filteredClients.length === 0 && (
+            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px 0', color: SING_COLORS.neutral.gray[400] }}>
+              Aucun client trouvé
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal Moderne */}
       {showModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }}
-        onClick={() => setShowModal(false)}>
-          <div style={{
-            background: '#fff',
-            borderRadius: SING_THEME.borderRadius.lg,
-            padding: '32px',
-            maxWidth: '700px',
-            width: '100%',
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }}
-          onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px', color: SING_COLORS.primary.main }}>
-              {editingClient ? 'Modifier le client' : 'Nouveau client'}
-            </h2>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px', backdropFilter: 'blur(4px)' }} onClick={() => setShowModal(false)}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', maxWidth: '700px', width: '100%', maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ padding: '24px 28px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: SING_COLORS.primary.dark, margin: 0 }}>
+                  {editingClient ? 'Modifier le client' : 'Nouveau client'}
+                </h2>
+                <p style={{ fontSize: '13px', color: SING_COLORS.neutral.gray[500], margin: '4px 0 0 0' }}>
+                  Remplissez les informations du client
+                </p>
+              </div>
+              <button onClick={() => setShowModal(false)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', backgroundColor: '#f3f4f6', color: SING_COLORS.neutral.gray[600], cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+                <X size={20} />
+              </button>
+            </div>
 
-            <form onSubmit={handleSubmit}>
-              {/* Informations Organisation */}
-              <div style={{ marginBottom: '24px', padding: '16px', background: SING_COLORS.neutral.gray[50], borderRadius: SING_THEME.borderRadius.md }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: SING_COLORS.neutral.gray[800] }}>
-                  📋 Informations Organisation
-                </h3>
-                
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                    Nom de l'organisation <span style={{ color: SING_COLORS.status.error }}>*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.nom}
-                    onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                    placeholder="Ex: SING SARL"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                      borderRadius: SING_THEME.borderRadius.md,
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                  />
+            {/* Body */}
+            <div style={{ padding: '28px', overflowY: 'auto', flex: 1 }}>
+              {/* Informations client */}
+              <div style={{ marginBottom: '28px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', paddingBottom: '12px', borderBottom: '2px solid #f3f4f6' }}>
+                  <User size={18} color={SING_COLORS.primary.main} />
+                  <h3 style={{ fontSize: '15px', fontWeight: '600', color: SING_COLORS.primary.dark, margin: 0 }}>Informations client</h3>
                 </div>
-
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                    Adresse
-                  </label>
-                  <textarea
-                    value={formData.adresse}
-                    onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
-                    rows={2}
-                    placeholder="Adresse complète de l'organisation"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                      borderRadius: SING_THEME.borderRadius.md,
-                      fontSize: '14px',
-                      outline: 'none',
-                      fontFamily: 'inherit',
-                      resize: 'vertical'
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'grid', gap: '16px' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                      Téléphone général
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700], marginBottom: '6px' }}>
+                      Nom du client <span style={{ color: '#dc2626' }}>*</span>
                     </label>
-                    <input
-                      type="tel"
-                      value={formData.tel}
-                      onChange={(e) => setFormData({ ...formData, tel: e.target.value })}
-                      placeholder="Standard téléphonique"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                        borderRadius: SING_THEME.borderRadius.md,
-                        fontSize: '14px',
-                        outline: 'none'
-                      }}
-                    />
+                    <input type="text" value={formData.nom} onChange={(e) => setFormData({ ...formData, nom: e.target.value })} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', transition: 'all 0.2s' }} placeholder="Ex: SING S.A." />
                   </div>
-
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                      Email général
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="contact@organisation.com"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                        borderRadius: SING_THEME.borderRadius.md,
-                        fontSize: '14px',
-                        outline: 'none'
-                      }}
-                    />
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700], marginBottom: '6px' }}>Adresse complète</label>
+                    <input type="text" value={formData.adresse} onChange={(e) => setFormData({ ...formData, adresse: e.target.value })} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', transition: 'all 0.2s' }} placeholder="Rue, quartier, ville" />
                   </div>
-                </div>
-
-                <div style={{ marginTop: '12px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                    Pays
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.pays}
-                    onChange={(e) => setFormData({ ...formData, pays: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                      borderRadius: SING_THEME.borderRadius.md,
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                  />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700], marginBottom: '6px' }}>Téléphone</label>
+                      <input type="text" value={formData.tel} onChange={(e) => setFormData({ ...formData, tel: e.target.value })} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', transition: 'all 0.2s' }} placeholder="+241 XX XX XX XX" />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700], marginBottom: '6px' }}>Email</label>
+                      <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', transition: 'all 0.2s' }} placeholder="contact@exemple.com" />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700], marginBottom: '6px' }}>Pays</label>
+                    <select value={formData.pays} onChange={(e) => setFormData({ ...formData, pays: e.target.value })} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', transition: 'all 0.2s', backgroundColor: 'white', cursor: 'pointer' }}>
+                      {PAYS_LIST.map(pays => <option key={pays} value={pays}>{pays}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
 
               {/* Représentants */}
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: SING_COLORS.neutral.gray[800] }}>
-                    👤 Représentants / Personnes de contact
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={addRepresentant}
-                    style={{
-                      padding: '6px 12px',
-                      background: SING_COLORS.secondary.main,
-                      color: SING_COLORS.neutral.gray[900],
-                      border: 'none',
-                      borderRadius: SING_THEME.borderRadius.md,
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    + Ajouter un représentant
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '12px', borderBottom: '2px solid #f3f4f6' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <User size={18} color={SING_COLORS.secondary.main} />
+                    <h3 style={{ fontSize: '15px', fontWeight: '600', color: SING_COLORS.primary.dark, margin: 0 }}>Représentants</h3>
+                  </div>
+                  <button type="button" onClick={addRepresentant} style={{ padding: '8px 14px', backgroundColor: SING_COLORS.secondary.main, color: SING_COLORS.primary.dark, border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }}>
+                    <Plus size={16} />
+                    Ajouter
                   </button>
                 </div>
-
                 {formData.representants.map((rep, index) => (
-                  <div key={index} style={{
-                    padding: '16px',
-                    background: rep.principal ? `${SING_COLORS.secondary.main}15` : SING_COLORS.neutral.gray[50],
-                    border: `2px solid ${rep.principal ? SING_COLORS.secondary.main : SING_COLORS.neutral.gray[200]}`,
-                    borderRadius: SING_THEME.borderRadius.md,
-                    marginBottom: '12px'
-                  }}>
+                  <div key={index} style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '12px', marginBottom: '12px', border: '1px solid #e5e7eb' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: SING_COLORS.neutral.gray[700] }}>
-                          Représentant {index + 1}
-                        </span>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={rep.principal}
-                            onChange={(e) => updateRepresentant(index, 'principal', e.target.checked)}
-                          />
-                          <span style={{ color: SING_COLORS.neutral.gray[700] }}>Principal</span>
-                        </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: SING_COLORS.secondary.main, color: SING_COLORS.primary.dark, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>{index + 1}</div>
+                        <span style={{ fontSize: '13px', fontWeight: '600', color: SING_COLORS.neutral.gray[700] }}>Représentant {index + 1}</span>
                       </div>
                       {formData.representants.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeRepresentant(index)}
-                          style={{
-                            padding: '4px 8px',
-                            background: SING_COLORS.status.error,
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: SING_THEME.borderRadius.sm,
-                            cursor: 'pointer',
-                            fontSize: '12px'
-                          }}
-                        >
-                          Supprimer
-                        </button>
+                        <button type="button" onClick={() => removeRepresentant(index)} style={{ padding: '6px 10px', backgroundColor: '#fee2e2', border: 'none', borderRadius: '6px', color: '#dc2626', cursor: 'pointer', fontSize: '12px', fontWeight: '600', transition: 'all 0.2s' }}>Supprimer</button>
                       )}
                     </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: SING_COLORS.neutral.gray[700] }}>
-                          Nom complet {index === 0 && <span style={{ color: SING_COLORS.status.error }}>*</span>}
-                        </label>
-                        <input
-                          type="text"
-                          required={index === 0}
-                          value={rep.nom}
-                          onChange={(e) => updateRepresentant(index, 'nom', e.target.value)}
-                          placeholder="Nom et prénom"
-                          style={{
-                            width: '100%',
-                            padding: '10px',
-                            border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                            borderRadius: SING_THEME.borderRadius.md,
-                            fontSize: '14px',
-                            outline: 'none'
-                          }}
-                        />
+                    <div style={{ display: 'grid', gap: '10px' }}>
+                      <input type="text" value={rep.nom} onChange={(e) => updateRepresentant(index, 'nom', e.target.value)} placeholder="Nom complet" style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', outline: 'none', backgroundColor: 'white' }} />
+                      <input type="text" value={rep.fonction || ''} onChange={(e) => updateRepresentant(index, 'fonction', e.target.value)} placeholder="Fonction / Poste" style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', outline: 'none', backgroundColor: 'white' }} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <input type="text" value={rep.tel || ''} onChange={(e) => updateRepresentant(index, 'tel', e.target.value)} placeholder="Téléphone" style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', outline: 'none', backgroundColor: 'white' }} />
+                        <input type="email" value={rep.email || ''} onChange={(e) => updateRepresentant(index, 'email', e.target.value)} placeholder="Email" style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', outline: 'none', backgroundColor: 'white' }} />
                       </div>
-
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: SING_COLORS.neutral.gray[700] }}>
-                          Fonction
-                        </label>
-                        <input
-                          type="text"
-                          value={rep.fonction || ''}
-                          onChange={(e) => updateRepresentant(index, 'fonction', e.target.value)}
-                          placeholder="Ex: Directeur, Responsable"
-                          style={{
-                            width: '100%',
-                            padding: '10px',
-                            border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                            borderRadius: SING_THEME.borderRadius.md,
-                            fontSize: '14px',
-                            outline: 'none'
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: SING_COLORS.neutral.gray[700] }}>
-                          Téléphone
-                        </label>
-                        <input
-                          type="tel"
-                          value={rep.tel || ''}
-                          onChange={(e) => updateRepresentant(index, 'tel', e.target.value)}
-                          placeholder="Téléphone direct"
-                          style={{
-                            width: '100%',
-                            padding: '10px',
-                            border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                            borderRadius: SING_THEME.borderRadius.md,
-                            fontSize: '14px',
-                            outline: 'none'
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: SING_COLORS.neutral.gray[700] }}>
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          value={rep.email || ''}
-                          onChange={(e) => updateRepresentant(index, 'email', e.target.value)}
-                          placeholder="Email direct"
-                          style={{
-                            width: '100%',
-                            padding: '10px',
-                            border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                            borderRadius: SING_THEME.borderRadius.md,
-                            fontSize: '14px',
-                            outline: 'none'
-                          }}
-                        />
-                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: SING_COLORS.neutral.gray[600], cursor: 'pointer', padding: '8px', backgroundColor: 'white', borderRadius: '6px' }}>
+                        <input type="checkbox" checked={rep.principal} onChange={(e) => updateRepresentant(index, 'principal', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                        <span style={{ fontWeight: '500' }}>Représentant principal</span>
+                      </label>
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
 
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    background: 'transparent',
-                    color: SING_COLORS.neutral.gray[600],
-                    border: `2px solid ${SING_COLORS.neutral.gray[300]}`,
-                    borderRadius: SING_THEME.borderRadius.md,
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    background: SING_COLORS.primary.main,
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: SING_THEME.borderRadius.md,
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {editingClient ? 'Mettre à jour' : 'Créer'}
-                </button>
-              </div>
-            </form>
+            {/* Footer */}
+            <div style={{ padding: '20px 28px', borderTop: '1px solid #f3f4f6', display: 'flex', gap: '12px', justifyContent: 'flex-end', backgroundColor: '#fafbfc' }}>
+              <button onClick={() => setShowModal(false)} style={{ padding: '12px 24px', backgroundColor: 'white', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', color: SING_COLORS.neutral.gray[700], transition: 'all 0.2s' }}>Annuler</button>
+              <button onClick={handleSave} disabled={saving || !formData.nom.trim()} style={{ padding: '12px 32px', backgroundColor: saving || !formData.nom.trim() ? SING_COLORS.neutral.gray[400] : SING_COLORS.primary.main, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: saving || !formData.nom.trim() ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,117,141,0.3)' }}>
+                {saving ? 'Enregistrement...' : editingClient ? 'Mettre à jour' : 'Créer le client'}
+              </button>
+            </div>
           </div>
         </div>
       )}

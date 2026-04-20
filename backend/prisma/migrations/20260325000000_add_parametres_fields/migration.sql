@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "parametres" 
+ADD COLUMN IF NOT EXISTS "num_statistique" TEXT NOT NULL DEFAULT '',
+ADD COLUMN IF NOT EXISTS "type_taxe" TEXT NOT NULL DEFAULT 'TVA',
+ADD COLUMN IF NOT EXISTS "modalites_paiement" JSONB NOT NULL DEFAULT '[]',
+ADD COLUMN IF NOT EXISTS "conditions_paiement" JSONB NOT NULL DEFAULT '[]';

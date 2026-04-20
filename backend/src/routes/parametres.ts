@@ -8,12 +8,36 @@ router.use(authenticateToken);
 // GET paramètres
 router.get('/', async (req, res) => {
   try {
+    const user = (req as any).user;
     const parametres = await prisma.parametres.findUnique({
-      where: { id: 1 }
+      where: { organisationId: user.organisationId }
     });
     
     if (!parametres) {
-      return res.status(404).json({ error: 'Paramètres non trouvés' });
+      // Créer les paramètres par défaut si ils n'existent pas
+      const newParametres = await prisma.parametres.create({
+        data: {
+          organisationId: user.organisationId,
+          nomEntreprise: 'Mon Entreprise',
+          adresse: '',
+          telephone: '',
+          email: '',
+          siteWeb: '',
+          rccm: '',
+          numStatistique: '',
+          capital: '',
+          tauxTps: 0.095,
+          tauxCss: 0.01,
+          tauxTva: 0.18,
+          tauxRemise: 0.095,
+          typeTaxe: 'TVA',
+          ribUba: '',
+          ribAfg: '',
+          modalitesPaiement: [],
+          conditionsPaiement: []
+        }
+      });
+      return res.json(newParametres);
     }
 
     res.json(parametres);
@@ -26,6 +50,7 @@ router.get('/', async (req, res) => {
 // PUT mettre à jour les paramètres (admin seulement)
 router.put('/', requireAdmin, async (req, res) => {
   try {
+    const user = (req as any).user;
     const {
       nomEntreprise,
       adresse,
@@ -33,39 +58,64 @@ router.put('/', requireAdmin, async (req, res) => {
       email,
       siteWeb,
       rccm,
+      numStatistique,
       capital,
       tauxTps,
       tauxCss,
       tauxTva,
       tauxRemise,
+      typeTaxe,
       ribUba,
-      ribAfg
+      ribAfg,
+      modalitesPaiement,
+      conditionsPaiement
     } = req.body;
 
-    const parametres = await prisma.parametres.update({
-      where: { id: 1 },
-      data: {
-        ...(nomEntreprise && { nomEntreprise }),
+    const parametres = await prisma.parametres.upsert({
+      where: { organisationId: user.organisationId },
+      update: {
+        ...(nomEntreprise !== undefined && { nomEntreprise }),
         ...(adresse !== undefined && { adresse }),
-        ...(telephone && { telephone }),
-        ...(email && { email }),
-        ...(siteWeb && { siteWeb }),
-        ...(rccm && { rccm }),
-        ...(capital && { capital }),
+        ...(telephone !== undefined && { telephone }),
+        ...(email !== undefined && { email }),
+        ...(siteWeb !== undefined && { siteWeb }),
+        ...(rccm !== undefined && { rccm }),
+        ...(numStatistique !== undefined && { numStatistique }),
+        ...(capital !== undefined && { capital }),
         ...(tauxTps !== undefined && { tauxTps }),
         ...(tauxCss !== undefined && { tauxCss }),
         ...(tauxTva !== undefined && { tauxTva }),
         ...(tauxRemise !== undefined && { tauxRemise }),
-        ...(ribUba && { ribUba }),
-        ...(ribAfg && { ribAfg })
+        ...(typeTaxe !== undefined && { typeTaxe }),
+        ...(ribUba !== undefined && { ribUba }),
+        ...(ribAfg !== undefined && { ribAfg }),
+        ...(modalitesPaiement !== undefined && { modalitesPaiement }),
+        ...(conditionsPaiement !== undefined && { conditionsPaiement })
+      },
+      create: {
+        organisationId: user.organisationId,
+        nomEntreprise: nomEntreprise || 'Mon Entreprise',
+        adresse: adresse || '',
+        telephone: telephone || '',
+        email: email || '',
+        siteWeb: siteWeb || '',
+        rccm: rccm || '',
+        numStatistique: numStatistique || '',
+        capital: capital || '',
+        tauxTps: tauxTps || 0.095,
+        tauxCss: tauxCss || 0.01,
+        tauxTva: tauxTva || 0.18,
+        tauxRemise: tauxRemise || 0.095,
+        typeTaxe: typeTaxe || 'TVA',
+        ribUba: ribUba || '',
+        ribAfg: ribAfg || '',
+        modalitesPaiement: modalitesPaiement || [],
+        conditionsPaiement: conditionsPaiement || []
       }
     });
 
     res.json(parametres);
   } catch (error: any) {
-    if (error.code === 'P2025') {
-      return res.status(404).json({ error: 'Paramètres non trouvés' });
-    }
     console.error('Erreur PUT paramètres:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
